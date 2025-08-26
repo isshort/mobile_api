@@ -8,8 +8,13 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
+  connectivity_plus: ^6.1.5
   flutter:
     sdk: flutter
+  flutter_secure_storage: ^9.2.4
+  fresh_graphql: ^0.6.1
+  graphql: ^5.2.1
+  http: ^1.5.0
 
 dev_dependencies:
   flutter_test:
