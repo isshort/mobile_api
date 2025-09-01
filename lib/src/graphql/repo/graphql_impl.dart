@@ -11,7 +11,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   IGraphQlImpl({
     required Uri apiUrl,
     CheckNetwork? checkNetwork,
-    IAppCacheRepo? appCache,
+    ICacheRepo? appCache,
   }) : _apiUrl = apiUrl,
        _appCache = appCache,
        _checkNetwork = checkNetwork {
@@ -21,7 +21,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   final Uri _apiUrl;
   final CheckNetwork? _checkNetwork;
 
-  final IAppCacheRepo? _appCache;
+  final ICacheRepo? _appCache;
 
   /// late variables
   late GraphQLClient _client;
@@ -34,7 +34,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   @override
   Uri get url => _apiUrl;
   @override
-  IAppCacheRepo? get cache => _appCache;
+  ICacheRepo? get cache => _appCache;
   void _init() {
     _freshLink = CustomFreshLink.oAuth2(
       tokenStorage: InMemoryTokenStorage(),

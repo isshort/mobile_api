@@ -13,7 +13,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   IHttpImpl({
     required Uri apiUrl,
     CheckNetwork? checkNetwork,
-    IAppCacheRepo? appCache,
+    ICacheRepo? appCache,
   }) : _apiUrl = apiUrl,
        _appCache = appCache,
        _checkNetwork = checkNetwork {
@@ -21,7 +21,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   }
   final Uri _apiUrl;
   final CheckNetwork? _checkNetwork;
-  final IAppCacheRepo? _appCache;
+  final ICacheRepo? _appCache;
 
   late Client _client;
   late ErrorResponse _errorResponseToJson;
@@ -397,7 +397,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   }
 
   @override
-  IAppCacheRepo? get cache => _appCache;
+  ICacheRepo? get cache => _appCache;
 
   @override
   ErrorResponse get errorResponseToJson => _errorResponseToJson;

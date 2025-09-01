@@ -1,6 +1,6 @@
 import 'package:mobile_api/src/utils/enum/cache.dart';
 
-abstract class IAppCacheRepo {
+abstract class ICacheRepo {
   Future<void> save(CacheEnum key, String value);
   Future<String> read(CacheEnum key);
   Future<void> clear();

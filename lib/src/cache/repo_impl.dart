@@ -2,8 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_api/src/cache/repo.dart';
 import 'package:mobile_api/src/utils/enum/cache.dart';
 
-final class AppCacheRepoImpl implements IAppCacheRepo {
-  AppCacheRepoImpl() {
+final class ICacheRepoImpl implements ICacheRepo {
+  ICacheRepoImpl() {
     _init();
   }
 

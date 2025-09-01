@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../../mobile_api.dart';
 
 mixin RefreshTokenMixin {
-  IAppCacheRepo? get cache;
+  ICacheRepo? get cache;
   ErrorResponse get errorResponseToJson;
   Uri get url;
 
