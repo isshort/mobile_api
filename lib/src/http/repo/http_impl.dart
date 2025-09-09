@@ -8,27 +8,25 @@ import 'package:http/retry.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
+import '../../utils/types/api_config.dart';
+
+
 
 final class IHttpImpl extends IHttp with RefreshTokenMixin {
   IHttpImpl({
-    required Uri apiUrl,
-    CheckNetwork? checkNetwork,
-    ICacheRepo? appCache,
-  }) : _apiUrl = apiUrl,
-       _appCache = appCache,
-       _checkNetwork = checkNetwork {
+    required ApiConfig apiConfig}) : _apiConfig = apiConfig {
+
     _init();
   }
-  final Uri _apiUrl;
-  final CheckNetwork? _checkNetwork;
-  final ICacheRepo? _appCache;
+ 
+  final ApiConfig _apiConfig;
 
   late Client _client;
   late ErrorResponse _errorResponseToJson;
 
   void _init() {
     _errorResponseToJson = ErrorResponse();
-    HttpOverrides.global = CustomHttpOverrides(bpHost: _apiUrl.host);
+    HttpOverrides.global = CustomHttpOverrides(bpHost: _apiConfig.apiUrl.host);
     final retryClient = RetryClient(
       Client(),
       retries: 1,
@@ -44,11 +42,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     BaseResponse? res,
     dynamic retryCount,
   ) async {
-    final token = await updateRefreshToken(_apiUrl);
-    req.headers['Authorization'] = 'Bearer ${token?.accessToken}';
-    req.headers['marketplace'] = 'PN';
-    req.headers['User-Agent'] =
-        'BpApp:${await _appCache?.read(CacheEnum.versionCode)}';
+    final token = await updateRefreshToken(_apiConfig.apiUrl);
+    req.headers[HttpHeadersConst.authorization] =
+        '${HttpHeadersConst.bearer} ${token?.accessToken}';
+    req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
+    req.headers[HttpHeadersConst.userAgent] =
+        '${HttpHeadersConst.userAgentValue}:${await _apiConfig.appCache?.read(CacheEnum.versionCode)}';
 
     return;
   }
@@ -68,6 +67,8 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     }
     return SimpleResult(result.statusCode, result.body);
   }
+ 
+
 
   @override
   Future<Result<S, E>> baseMethod<S, E extends Exception>(
@@ -79,22 +80,16 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     String? query,
     Map<String, dynamic>? body,
   }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<S, E>(errorFromJson: errorFromJson);
-      }
-
-      return _customRequest(
+    return handleNetworkCall(() async {
+      final response = await _customHttpRequest(
         path,
         requestType: requestType,
         headerParams: params,
         query: query,
         body: body,
-      ).then((value) => customHttpResponse(dataFromJson, errorFromJson, value));
-    } catch (e) {
-      await addLogger(e.toString().subStringLongString);
-      return onExceptionError<S, E>(e, errorFromJson, _errorResponseToJson);
-    }
+      );
+      return customHttpResponse<S, E>(dataFromJson, errorFromJson, response);
+    }, errorFromJson);
   }
 
   @override
@@ -107,118 +102,23 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     String? query,
     Map<String, dynamic>? body,
   }) async {
-    if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-      return checkNetworkStatus<S, E>(errorFromJson: errorFromJson);
-    }
-    try {
-      return _customRequest(
+    return handleNetworkCall(() async {
+      final response = await _customHttpRequest(
         path,
         requestType: requestType,
         headerParams: params,
         query: query,
         body: body,
-      ).then(
-        (value) => customHttpResponseType(
+      );
+      return customHttpResponseType<S, E>(
           dataFromJson: dataFromJson,
           exception: errorFromJson,
-          response: value,
-        ),
+        response: response,
       );
-    } catch (e) {
-      await addLogger(e.toString().subStringLongString);
-      return onExceptionError<S, E>(e, errorFromJson, _errorResponseToJson);
-    }
+    }, errorFromJson);
   }
 
-  @override
-  Future<SimpleResult> uploadImage({
-    required String filePath,
-    required String fileLabel,
-    required String path,
-    String? method,
-    Map<String, dynamic>? queryParameters,
-  }) async {
-    if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-      return SimpleResult(
-        HttpStatus.gatewayTimeout,
-        AppErrorMessage.noInternet,
-      );
-    }
-    try {
-      final request =
-          MultipartRequest(
-              method ?? RequestType.post.value,
-              _apiUrl.replace(path: path, queryParameters: queryParameters),
-            )
-            ..headers[HttpHeaders.authorizationHeader] =
-                'Bearer ${await _appCache?.read(CacheEnum.token)}'
-            ..headers['marketplace'] = 'PN'
-            ..files.add(
-              await MultipartFile.fromPath(
-                fileLabel,
-                filePath,
-                contentType: MediaType('image', 'jpeg'),
-              ),
-            );
-      // log('${_appCache?.read(CacheEnum.token)}');
-      final result = await request.send().timeout(
-        DurationEnum.extraLong.duration,
-      );
-      if (result.statusCode != HttpStatus.ok) {
-        await addLogger(result.errorFullMessageHttpStream);
-      }
-      return _imageResponse(result);
-    } catch (e) {
-      await addLogger(e.toString().subStringLongString);
-      return SimpleResult(HttpStatus.internalServerError, e.toString());
-    }
-  }
 
-  @override
-  Future<SimpleResult> multipleImages({
-    required String path,
-    required Map<String, String> images,
-    String? method,
-    Map<String, dynamic>? queryParameters,
-  }) async {
-    if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-      return SimpleResult(
-        HttpStatus.gatewayTimeout,
-        AppErrorMessage.noInternet,
-      );
-    }
-    try {
-      final request =
-          MultipartRequest(
-              method ?? RequestType.post.value,
-              _apiUrl.replace(path: path, queryParameters: queryParameters),
-            )
-            ..headers[HttpHeaders.authorizationHeader] =
-                'Bearer ${await _appCache?.read(CacheEnum.token)}'
-            ..headers['marketplace'] = 'PN';
-      images.forEach((key, value) async {
-        request.files.add(
-          await MultipartFile.fromPath(
-            key,
-            value,
-            filename: key,
-            contentType: MediaType('image', 'jpeg'),
-          ),
-        );
-      });
-
-      final result = await request.send().timeout(
-        DurationEnum.extraLong.duration,
-      );
-      if (result.statusCode != HttpStatus.ok) {
-        await addLogger(result.errorFullMessageHttpStream);
-      }
-      return _imageResponse(result);
-    } catch (e) {
-      await addLogger(e.toString().subStringLongString);
-      return SimpleResult(HttpStatus.internalServerError, e.toString());
-    }
-  }
 
   @override
   Future<Result<S, E>?> multipart<S, E extends Exception>(
@@ -230,25 +130,26 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     Map<String, dynamic>? params,
     RequestType? httpMethod,
   }) async {
-    final request =
-        MultipartRequest(
-            httpMethod?.value ?? RequestType.post.value,
-            _apiUrl.replace(path: path),
-          )
-          ..fields.addAll(body)
-          ..headers.addAll(getHeaders);
-
-    if (files != null && files.isNotEmpty) {
-      for (final file in files.entries) {
-        final fromPath = await MultipartFile.fromPath(
-          file.key,
-          file.value,
-          contentType: MediaType('image', 'jpeg'),
-        );
-        request.files.add(fromPath);
-      }
-    }
-
+    final uri = _apiConfig.apiUrl.replace(path: path, queryParameters: params);
+    final request = await _createMultipartRequest(
+      httpMethod?.value ?? RequestType.post.value,
+      uri,
+ 
+      fields: body,
+      files: files != null
+          ? {
+              for (final entry in files.entries)
+                entry.key: await MultipartFile.fromPath(
+                  entry.key,
+                  entry.value,
+                  contentType: MediaType(
+                    HttpHeadersConst.contentTypeImage,
+                    HttpHeadersConst.contentTypeJpeg,
+                  ),
+                ),
+            }
+          : null,
+    );
     final response = await request.send();
     String? responseBody;
     final stream = response.stream.transform(utf8.decoder);
@@ -264,64 +165,70 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     await addLogger(responseBody);
     return Failure(errorFromJson(CustomJsonDecoder.toJsonData(responseBody)));
   }
-
-  SimpleResult _imageResponse(http.StreamedResponse result) {
-    return SimpleResult(
-      result.statusCode,
-      result.reasonPhrase ?? '${result.request}',
-    );
+  
+  Future<MultipartRequest> _createMultipartRequest(
+    String method,
+    Uri uri, {
+    Map<String, String>? fields,
+    Map<String, MultipartFile>? files,
+  }) async {
+    final request = MultipartRequest(method, uri)
+      ..headers.addAll(await defaultHeaders());
+    if (fields != null) request.fields.addAll(fields);
+    if (files != null) request.files.addAll(files.values);
+    return request;
   }
 
-  Future<Response> _customRequest(
+  Future<Response> _customHttpRequest(
     String path, {
     required RequestType requestType,
     Map<String, dynamic>? headerParams,
     Map<String, dynamic>? body,
     String? query,
-  }) {
+  }) async {
     final request = switch (requestType) {
       RequestType.get => _client.get(
-        _apiUrl.replace(
+        _apiConfig.apiUrl.replace(
           path: path,
           queryParameters: headerParams,
           query: query,
         ),
-        headers: getHeaders,
+        headers: await defaultHeaders(),
       ),
       RequestType.post => _client.post(
-        _apiUrl.replace(
+        _apiConfig.apiUrl.replace(
           path: path,
           queryParameters: headerParams,
           query: query,
         ),
-        headers: getHeaders,
+        headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.put => _client.put(
-        _apiUrl.replace(
+        _apiConfig.apiUrl.replace(
           path: path,
           queryParameters: headerParams,
           query: query,
         ),
-        headers: getHeaders,
+        headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.patch => _client.patch(
-        _apiUrl.replace(
+        _apiConfig.apiUrl.replace(
           path: path,
           queryParameters: headerParams,
           query: query,
         ),
-        headers: getHeaders,
+        headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.delete => _client.delete(
-        _apiUrl.replace(
+        _apiConfig.apiUrl.replace(
           path: path,
           queryParameters: headerParams,
           query: query,
         ),
-        headers: getHeaders,
+        headers: await defaultHeaders(),
       ),
     };
 
@@ -396,12 +303,13 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     return statusResult;
   }
 
-  @override
-  ICacheRepo? get cache => _appCache;
+ 
 
   @override
   ErrorResponse get errorResponseToJson => _errorResponseToJson;
 
+ 
+  
   @override
-  Uri get url => _apiUrl;
+  ApiConfig get apiConfig => _apiConfig;
 }
