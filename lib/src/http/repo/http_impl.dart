@@ -47,7 +47,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         '${HttpHeadersConst.bearer} ${token?.accessToken}';
     req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
     req.headers[HttpHeadersConst.userAgent] =
-        '${HttpHeadersConst.userAgentValue}:${await _apiConfig.appCache?.read(CacheEnum.versionCode)}';
+        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CacheEnum.versionCode)}';
 
     return;
   }
