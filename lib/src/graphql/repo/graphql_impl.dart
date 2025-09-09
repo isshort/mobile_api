@@ -6,22 +6,14 @@ import 'package:graphql/client.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../mobile_api.dart';
+import '../../utils/types/api_config.dart';
 
 final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
-  IGraphQlImpl({
-    required Uri apiUrl,
-    CheckNetwork? checkNetwork,
-    IAppCacheRepo? appCache,
-  }) : _apiUrl = apiUrl,
-       _appCache = appCache,
-       _checkNetwork = checkNetwork {
+  IGraphQlImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
     _init();
   }
 
-  final Uri _apiUrl;
-  final CheckNetwork? _checkNetwork;
-
-  final IAppCacheRepo? _appCache;
+  final ApiConfig _apiConfig;
 
   /// late variables
   late GraphQLClient _client;
@@ -31,15 +23,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   @override
   ErrorResponse get errorResponseToJson => _errorResponseToJson;
 
-  @override
-  Uri get url => _apiUrl;
-  @override
-  IAppCacheRepo? get cache => _appCache;
   void _init() {
     _freshLink = CustomFreshLink.oAuth2(
       tokenStorage: InMemoryTokenStorage(),
       refreshToken: (p0, p1) async {
-        final token = await updateRefreshToken(_apiUrl);
+        final token = await updateRefreshToken(_apiConfig.apiUrl);
         return IBOAuth2Token(
           accessToken: token?.accessToken ?? '',
           refreshToken: token?.refreshToken ?? '',
@@ -50,7 +38,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
       },
     );
     _client = GraphQLClient(
-      link: Link.from([_freshLink, HttpLink('$_apiUrl')]),
+      link: Link.from([_freshLink, HttpLink('${_apiConfig.apiUrl}')]),
       cache: GraphQLCache(),
     );
   }
@@ -64,23 +52,18 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   }
 
   Future<void> _getHeaders() async {
-    await _freshLink.setToken(
-      IBOAuth2Token(
-        accessToken: await _appCache?.read(CacheEnum.token) ?? '',
-        refreshToken: await _appCache?.read(CacheEnum.refresh) ?? '',
-      ),
-    );
+    // await _freshLink.setToken(
+    //   IBOAuth2Token(
+    //     accessToken: await _appCache?.read(CacheEnum.token) ?? '',
+    //     refreshToken: await _appCache?.read(CacheEnum.refresh) ?? '',
+    //   ),
+    // );
     _client = _client.copyWith(
       link: Link.from([
         _freshLink,
         HttpLink(
-          '$_apiUrl',
-          defaultHeaders: {
-            'accept-Language': await _appCache?.read(CacheEnum.lang) ?? 'en',
-            'marketplace': 'PN',
-            'User-Agent':
-                'BpApp:${await _appCache?.read(CacheEnum.versionCode)}',
-          },
+          '${_apiConfig.apiUrl}',
+          defaultHeaders: await defaultHeaders(),
         ),
       ]),
       cache: GraphQLCache(),
@@ -112,10 +95,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     required String field,
     MapParam? params,
   }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<R, E>(errorFromJson: errorFromJson);
-      }
+    return handleNetworkCall(() async {
       await _getHeaders();
       final request = await _queryRequest(path: path, variables: params);
       if (request.hasException) {
@@ -126,9 +106,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         );
       }
       return request.responseQueryDetail<R, E>(dataFromJson, field);
-    } catch (e) {
-      return onExceptionError(e, errorFromJson, _errorResponseToJson);
-    }
+    }, errorFromJson);
   }
 
   @override
@@ -138,10 +116,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     required String path,
     MapParam? params,
   }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<R, E>(errorFromJson: errorFromJson);
-      }
+    return handleNetworkCall(() async {
       await _getHeaders();
       final request = await _queryRequest(path: path, variables: params);
       if (request.hasException) {
@@ -153,16 +128,14 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
       }
       final response = request.responseMultipleQuery<R, E>(dataFromJson);
       if (response != null) return response;
-    } catch (e) {
-      return onExceptionError(e, errorFromJson, _errorResponseToJson);
-    }
-    return Failure(
-      errorFromJson(
-        _errorResponseToJson
-            .copyWith(status: 503, reasonPhrase: 'Bad request')
-            .toJson(),
-      ),
-    );
+      return Failure(
+        errorFromJson(
+          _errorResponseToJson
+              .copyWith(status: 503, reasonPhrase: 'Bad request')
+              .toJson(),
+        ),
+      );
+    }, errorFromJson);
   }
 
   @override
@@ -174,10 +147,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     MapParam? params,
     DurationEnum? timeout,
   }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<R, E>(errorFromJson: errorFromJson);
-      }
+    return handleNetworkCall(() async {
       await _getHeaders();
 
       final request = await _queryRequest(
@@ -194,9 +164,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         );
       }
       return request.responseDetail<R, E>(dataFromJson, field);
-    } catch (e) {
-      return onExceptionError(e, errorFromJson, _errorResponseToJson);
-    }
+    }, errorFromJson);
   }
 
   @override
@@ -207,38 +175,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     required String field,
     MapParam? params,
   }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<List<R>, E>(errorFromJson: errorFromJson);
-      }
-      await _getHeaders();
-      final request = await _queryRequest(path: path, variables: params);
-      if (request.hasException) {
-        return errorGraphQlResponse(
-          errorFromJson,
-          request,
-          _errorResponseToJson,
-        );
-      }
-
-      return request.responseItemPageList(dataFromJson, field);
-    } catch (e) {
-      return onExceptionError(e, errorFromJson, _errorResponseToJson);
-    }
-  }
-
-  @override
-  Future<Result<List<R>, E>> list<R, E extends Exception>({
-    required FromJsonFun<R> dataFromJson,
-    required ErrorFromJson<E> errorFromJson,
-    required String path,
-    required String field,
-    MapParam? params,
-  }) async {
-    try {
-      if (_checkNetwork != null && !await _checkNetwork.isConnected) {
-        return checkNetworkStatus<List<R>, E>(errorFromJson: errorFromJson);
-      }
+    return handleNetworkCallList(() async {
       await _getHeaders();
       final request = await _queryRequest(path: path, variables: params);
       if (request.hasException) {
@@ -249,9 +186,29 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         );
       }
       return request.responseList<R, E>(dataFromJson, field);
-    } catch (e) {
-      return onExceptionError(e, errorFromJson, _errorResponseToJson);
-    }
+    }, errorFromJson);
+  }
+
+  @override
+  Future<Result<List<R>, E>> list<R, E extends Exception>({
+    required FromJsonFun<R> dataFromJson,
+    required ErrorFromJson<E> errorFromJson,
+    required String path,
+    required String field,
+    MapParam? params,
+  }) async {
+    return handleNetworkCallList(() async {
+      await _getHeaders();
+      final request = await _queryRequest(path: path, variables: params);
+      if (request.hasException) {
+        return errorGraphQlResponse(
+          errorFromJson,
+          request,
+          _errorResponseToJson,
+        );
+      }
+      return request.responseList<R, E>(dataFromJson, field);
+    }, errorFromJson);
   }
 
   Failure<R, E> errorGraphQlResponse<R, E extends Exception>(
@@ -382,4 +339,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
       ),
     );
   }
+
+  @override
+  ApiConfig get apiConfig => _apiConfig;
 }

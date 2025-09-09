@@ -27,13 +27,7 @@ abstract class IHttp {
     Map<String, dynamic>? body,
   });
 
-  Future<SimpleResult> uploadImage({
-    required String filePath,
-    required String fileLabel,
-    required String path,
-    Map<String, dynamic>? queryParameters,
-    String? method,
-  });
+ 
   Future<Result<S, E>?> multipart<S, E extends Exception>(
     String path, {
     required FromJsonFun<S> successFromJson,
@@ -43,10 +37,5 @@ abstract class IHttp {
     Map<String, dynamic>? params,
     RequestType? httpMethod,
   });
-  Future<SimpleResult> multipleImages({
-    required String path,
-    required Map<String, String> images,
-    String? method,
-    Map<String, dynamic>? queryParameters,
-  });
+  
 }
