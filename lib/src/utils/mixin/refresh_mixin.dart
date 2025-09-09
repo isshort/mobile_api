@@ -11,10 +11,8 @@ final class HttpHeadersConst {
   static const bearer = 'Bearer';
   static const marketplace = 'marketplace';
   static const userAgent = 'User-Agent';
-  static const marketplaceValue = 'PN';
   static const contentTypeImage = 'image';
   static const contentTypeJpeg = 'jpeg';
-  static const userAgentValue = 'BpApp';
   static const contentTypeJson = 'application/json; charset=utf-8';
   static const accept = 'Accept';
   static const acceptLanguage = 'Accept-Language';
@@ -103,11 +101,11 @@ mixin RefreshTokenMixin {
       HttpHeaders.contentTypeHeader: HttpHeadersConst.contentTypeJson,
       HttpHeaders.acceptHeader: HttpHeadersConst.contentTypeJson,
       HttpHeadersConst.authorization: '${HttpHeadersConst.bearer} $token',
-      HttpHeadersConst.marketplace: HttpHeadersConst.marketplaceValue,
+      HttpHeadersConst.marketplace: apiConfig.marketplaceValue,
       HttpHeadersConst.acceptLanguage: lan,
       if (versionCode != null && versionCode.isNotEmpty)
         HttpHeadersConst.userAgent:
-            '${HttpHeadersConst.userAgentValue}:$versionCode',
+            '${apiConfig.userAgentValue}:$versionCode',
     };
   }
  
