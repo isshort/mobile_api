@@ -6,12 +6,26 @@ final class ApiConfig {
   final String userAgentValue;
   final CheckNetwork? checkNetwork;
   final ICacheRepo? appCache;
+  final PageFieldKeys pageFieldKeys;
 
   ApiConfig({
     required this.apiUrl,
     required this.marketplaceValue,
     required this.userAgentValue,
+    this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
+  });
+}
+
+/// Configuration for paginated GraphQL container keys.
+class PageFieldKeys {
+  final String itemsKey;
+  final String pageInfoKey;
+  final String hasNextPageKey;
+  const PageFieldKeys({
+    this.itemsKey = 'items',
+    this.pageInfoKey = 'pageInfo',
+    this.hasNextPageKey = 'hasNextPage',
   });
 }

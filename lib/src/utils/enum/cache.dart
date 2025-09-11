@@ -1,3 +1,13 @@
+abstract class CacheKey {
+  String get value;
+  const CacheKey();
+
+  @override
+  String toString() => value;
+}
+
+// abstract final class 
+
 /// App Cache key
 enum CacheEnum {
   /// for onboarding

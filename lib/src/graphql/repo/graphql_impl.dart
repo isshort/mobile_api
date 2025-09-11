@@ -6,7 +6,6 @@ import 'package:graphql/client.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../mobile_api.dart';
-import '../../utils/types/api_config.dart';
 
 final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   IGraphQlImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
@@ -105,7 +104,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
           _errorResponseToJson,
         );
       }
-      return request.responseQueryDetail<R, E>(dataFromJson, field);
+      return request.responseQueryDetail<R, E>(
+        field: field,
+        fromJson: dataFromJson,
+        keys: apiConfig.pageFieldKeys,
+      );
     }, errorFromJson);
   }
 
