@@ -7,11 +7,18 @@ final class ApiConfig {
   final CheckNetwork? checkNetwork;
   final ICacheRepo? appCache;
   final PageFieldKeys pageFieldKeys;
+  final String refreshTokenPath;
+  final String loggerPath;
+  final String defaultLanguage;
+
 
   ApiConfig({
     required this.apiUrl,
     required this.marketplaceValue,
     required this.userAgentValue,
+    required this.refreshTokenPath,
+    required this.loggerPath,
+    this.defaultLanguage = 'en',
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,

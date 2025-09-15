@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
 import '../../../mobile_api.dart';
+
 final class HttpHeadersConst {
   HttpHeadersConst._();
   static const authorization = 'Authorization';
@@ -20,7 +22,14 @@ final class HttpHeadersConst {
 mixin RefreshTokenMixin {
   ApiConfig get apiConfig;
   ErrorResponse get errorResponseToJson;
- 
+
+  http.Client get httpClient;
+
+  String get refreshTokenPath => apiConfig.refreshTokenPath;
+  String get loggerPath => apiConfig.loggerPath;
+
+  /// Concurrency guard so only one refresh runs at a time.
+  static Completer<IBOAuth2Token?>? _refreshCompleter;
 
   Future<Failure<R, E>> checkNetworkStatus<R, E extends Exception>({
     required FromJsonFun<E> errorFromJson,
@@ -29,7 +38,7 @@ mixin RefreshTokenMixin {
       errorResponseToJson
           .copyWith(
             status: HttpStatus.gatewayTimeout,
-            reasonPhrase: 'Нет подключения к Интернету',
+            reasonPhrase: 'No internet connection',
           )
           .toJson(),
     ),
@@ -67,38 +76,93 @@ mixin RefreshTokenMixin {
     }
   }
 
-  Future<IBOAuth2Token?> updateRefreshToken(Uri url) async {
-    final refreshToken =
-        await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
-    if (refreshToken.isNotEmpty) {
-      final response = await http.Client().post(
-        url.replace(path: 'Auths/MobileUser/RefreshToken'),
-        headers: await defaultHeaders(),
-        body: jsonEncode({'refreshToken': refreshToken}),
-      );
-      if (response.statusCode == HttpStatus.ok) {
-        final dynamic body = await jsonDecode(response.body);
-        if (body is! Map) return null;
-        final token = IBOAuth2Token.fromJson(
-          body['data'] as Map<String, dynamic>,
-        );
-        await apiConfig.appCache?.saveAll(
-          CacheKeyBundle.tokenPair(
-            access: token.accessToken,
-            refresh: token.refreshToken,
-          ),
-        );
-        return token;
-      }
+  /// Build refresh request body (override if backend differs).
+  Map<String, dynamic> buildRefreshBody(String refreshToken) => {
+    'refreshToken': refreshToken,
+  };
+
+  /// Called after new tokens stored (override for extra side-effects).
+  Future<void> onTokensUpdated(IBOAuth2Token token) async {}
+
+  /// Override for custom logger payload shaping.
+  Map<String, dynamic> buildLoggerPayload(String message) => {
+    'description': message,
+  };
+  Future<IBOAuth2Token?> updateRefreshToken() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
     }
-    return null;
+    _refreshCompleter = Completer<IBOAuth2Token?>();
+
+    try {
+      final refreshToken =
+          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
+      if (refreshToken.isEmpty) {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+      final rawPath = refreshTokenPath.trim();
+      final normalized = rawPath.startsWith('/')
+          ? rawPath.substring(1)
+          : rawPath;
+      final uri = (apiConfig.apiUrl).replace(path: normalized);
+
+      final response = await httpClient.post(
+        uri,
+        headers: await defaultHeaders(),
+        body: jsonEncode(buildRefreshBody(refreshToken)),
+      );
+      if (response.statusCode != HttpStatus.ok) {
+        await addLogger(
+          'Refresh failed: ${response.statusCode} ${response.body}',
+        );
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+
+      final dynamic body = jsonDecode(response.body);
+      if (body is! Map) {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+
+      final tokenJson = body['data'];
+      if (tokenJson is! Map<String, dynamic>) {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+
+      final token = IBOAuth2Token.fromJson(tokenJson);
+
+      if (token.accessToken.isEmpty) {
+        _refreshCompleter!.complete(null);
+        return null;
+      }
+
+      await apiConfig.appCache?.saveAll(
+        CacheKeyBundle.tokenPair(
+          access: token.accessToken,
+          refresh: token.refreshToken,
+        ),
+      );
+      await onTokensUpdated(token);
+      _refreshCompleter!.complete(token);
+      return token;
+    } catch (e) {
+      await addLogger('Refresh exception: $e');
+      _refreshCompleter!.complete(null);
+      return null;
+    } finally {
+      _refreshCompleter = null;
+    }
   }
+
   Future<Map<String, String>> defaultHeaders() async {
     final token =
         await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
     final lan = await apiConfig.appCache?.read(CoreCacheKey.language) ?? 'ru';
     final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
-    
+
     return {
       HttpHeaders.contentTypeHeader: HttpHeadersConst.contentTypeJson,
       HttpHeaders.acceptHeader: HttpHeadersConst.contentTypeJson,
@@ -106,43 +170,39 @@ mixin RefreshTokenMixin {
       HttpHeadersConst.marketplace: apiConfig.marketplaceValue,
       HttpHeadersConst.acceptLanguage: lan,
       if (versionCode != null && versionCode.isNotEmpty)
-        HttpHeadersConst.userAgent:
-            '${apiConfig.userAgentValue}:$versionCode',
+        HttpHeadersConst.userAgent: '${apiConfig.userAgentValue}:$versionCode',
     };
   }
- 
 
   Future<void> addLogger(String? loggerMessage) async {
-    if (loggerMessage == null) return;
-    await http.Client().post(
-      apiConfig.apiUrl.replace(path: 'loggers/api/Log/AddError'),
-      body: jsonEncode({'description': loggerMessage}),
-      headers: await defaultHeaders(),
-    );
+    if (loggerMessage == null || loggerMessage.isEmpty) return;
+    final raw = loggerPath.trim();
+    if (raw.isEmpty) return; // logging disabled if path blank
+    final path = raw.startsWith('/') ? raw.substring(1) : raw;
+    final uri = apiConfig.apiUrl.replace(path: path);
+    try {
+      await httpClient.post(
+        uri,
+        body: jsonEncode(buildLoggerPayload(loggerMessage)),
+        headers: await defaultHeaders(),
+      );
+    } catch (_) {
+      // Intentionally swallow logging errors.
+    }
   }
+
 
   Failure<T, E> onExceptionError<T, E extends Exception>(
     Object e,
     FromJsonFun<E> errorFromJson,
     ErrorResponse errorData,
   ) {
-    if (e is SocketException) {
-      return Failure(
-        errorFromJson(
-          errorData
-              .copyWith(
-                status: HttpStatus.serviceUnavailable,
-                reasonPhrase: '$e',
-              )
-              .toJson(),
-        ),
-      );
-    }
+    final status = e is SocketException
+        ? HttpStatus.serviceUnavailable
+        : HttpStatus.badRequest;
     return Failure(
       errorFromJson(
-        errorData
-            .copyWith(status: HttpStatus.badRequest, reasonPhrase: '$e')
-            .toJson(),
+        errorData.copyWith(status: status, reasonPhrase: '$e').toJson(),
       ),
     );
   }

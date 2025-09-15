@@ -41,7 +41,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     BaseResponse? res,
     dynamic retryCount,
   ) async {
-    final token = await updateRefreshToken(_apiConfig.apiUrl);
+    final token = await updateRefreshToken();
     req.headers[HttpHeadersConst.authorization] =
         '${HttpHeadersConst.bearer} ${token?.accessToken}';
     req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
@@ -311,4 +311,6 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   
   @override
   ApiConfig get apiConfig => _apiConfig;
+  @override
+  http.Client get httpClient => _client;
 }

@@ -26,7 +26,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     _freshLink = CustomFreshLink.oAuth2(
       tokenStorage: InMemoryTokenStorage(),
       refreshToken: (p0, p1) async {
-        final token = await updateRefreshToken(_apiConfig.apiUrl);
+        final token = await updateRefreshToken();
         return IBOAuth2Token(
           accessToken: token?.accessToken ?? '',
           refreshToken: token?.refreshToken ?? '',
@@ -345,4 +345,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
 
   @override
   ApiConfig get apiConfig => _apiConfig;
+  final _rawClient = http.Client();
+  @override
+  http.Client get httpClient => _rawClient;
 }
