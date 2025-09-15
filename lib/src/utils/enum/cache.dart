@@ -6,81 +6,57 @@ abstract class CacheKey {
   String toString() => value;
 }
 
-// abstract final class 
+abstract final class CacheKeyResolver {
+  static String asString(dynamic key) {
+    if (key is CacheKey) return key.value;
+    if (key is Enum) return key.name;
+    if (key is String) return key;
+    throw ArgumentError('Unsupported cache key type: $key');
+  }
+}
 
-/// App Cache key
-enum CacheEnum {
-  /// for onboarding
-  onboard('bp-onboard'),
+/// User/app-defined dynamic key (allows any custom key).
+class DynamicCacheKey extends CacheKey {
+  const DynamicCacheKey(this.value);
+  @override
+  final String value;
+}
 
-  /// register user control
-  register('bp-register'),
+ 
+/// Built-in reusable (generic) keys.
+class CoreCacheKey extends CacheKey {
+  const CoreCacheKey._(this.value);
+  @override
+  final String value;
 
-  /// for accepting agreement
-  agreement('bp-agreement'),
+  // Common auth / app keys
+  static const accessToken = CoreCacheKey._('access_token');
+  static const refreshToken = CoreCacheKey._('refresh_token');
+  static const theme = CoreCacheKey._('theme');
+  static const pinCode = CoreCacheKey._('pin_code');
+  static const appVersion = CoreCacheKey._('app_version');
+  static const language = CoreCacheKey._('language');
 
-  /// theme
-  theme('bp-theme'),
+ 
 
-  /// system theme
-  // systemTheme('bp-system-theme'),
+  /// Keys you may want to preload / clear together.
+  static const bootstrap = <CoreCacheKey>[accessToken, refreshToken, theme];
+}
 
-  /// for language cache
-  lang('bp-lang'),
+ 
+abstract final class CacheKeyBundle {
+  static Map<CacheKey, String> tokenPair({
+    required String access,
+    required String refresh,
+  }) => {CoreCacheKey.accessToken: access, CoreCacheKey.refreshToken: refresh};
 
-  /// for refresh token
-  refresh('bp-refresh'),
-
-  /// for access token
-  token('bp-token'),
-
-  /// for login status
-  login('bp-login'),
-
-  /// for cookie token
-  cookie('bp-cookie'),
-
-  /// for biometric info
-  biometric('bp-biometric'),
-
-  /// for phone number
-  phoneNumber('bp-phone-number-exist'),
-  terminalId('bp-terminal-id-exist'),
-  versionCode('bp-version-code-exist'),
-
-  // for pin code
-  pinCode('bp-pin-code'),
-  // offline qrcode
-  offlineQrCode('bp-offline-qr-code'),
-  ;
-
-  const CacheEnum(this.name);
-  final String name;
-
-  /// project init value
-  static Iterable<String> get getInitValue => [
-        refresh.name,
-        token.name,
-        theme.name,
-      ];
-
-  static Map<CacheEnum, String> saveToken(
-    String newAccessToken,
-    String newRefreshToken,
-  ) =>
-      {
-        token: newAccessToken,
-        refresh: newRefreshToken,
-      };
-
-  static Map<CacheEnum, String> getInitValueMap(
-    String newAccessToken,
-    String newRefreshToken,
-    String newPinCode,
-  ) =>
-      {
-        token: newAccessToken,
-        refresh: newRefreshToken,
-        pinCode: newPinCode,
-      };
+  static Map<CacheKey, String> initialSecure({
+    required String access,
+    required String refresh,
+    String? pin,
+  }) => {
+    CoreCacheKey.accessToken: access,
+    CoreCacheKey.refreshToken: refresh,
+    if (pin != null) CoreCacheKey.pinCode: pin,
+  };
 }

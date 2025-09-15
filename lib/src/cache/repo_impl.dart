@@ -19,28 +19,28 @@ final class ICacheRepoImpl implements ICacheRepo {
   }
 
   @override
-  Future<void> delete(CacheEnum key) async {
-    await _secureStorage.delete(key: key.name);
+  Future<void> delete(CacheKey key) async {
+    await _secureStorage.delete(key: key.value);
   }
 
   @override
-  Future<void> deleteAll(List<CacheEnum> keys) async {
+  Future<void> deleteAll(List<CacheKey> keys) async {
     await Future.wait(keys.map(delete));
   }
 
   @override
-  Future<String> read(CacheEnum key) async {
-    final sec = await _secureStorage.read(key: key.name);
+  Future<String> read(CacheKey key) async {
+    final sec = await _secureStorage.read(key: key.value);
     return sec ?? '';
   }
 
   @override
-  Future<void> save(CacheEnum key, String value) async {
-    await _secureStorage.write(key: key.name, value: value);
+  Future<void> save(CacheKey key, String value) async {
+    await _secureStorage.write(key: key.value, value: value);
   }
 
   @override
-  Future<void> saveAll(Map<CacheEnum, String> values) async {
+  Future<void> saveAll(Map<CacheKey, String> values) async {
     await Future.wait(
       values.entries.map((entry) => save(entry.key, entry.value)),
     );

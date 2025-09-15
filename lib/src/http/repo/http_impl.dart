@@ -8,7 +8,6 @@ import 'package:http/retry.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
-import '../../utils/types/api_config.dart';
 
 
 
@@ -47,7 +46,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         '${HttpHeadersConst.bearer} ${token?.accessToken}';
     req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
     req.headers[HttpHeadersConst.userAgent] =
-        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CacheEnum.versionCode)}';
+        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CoreCacheKey.appVersion)}';
 
     return;
   }

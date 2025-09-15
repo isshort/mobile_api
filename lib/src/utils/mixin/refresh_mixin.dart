@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:mobile_api/src/utils/types/api_config.dart';
 
 import '../../../mobile_api.dart';
 final class HttpHeadersConst {
@@ -70,9 +69,7 @@ mixin RefreshTokenMixin {
 
   Future<IBOAuth2Token?> updateRefreshToken(Uri url) async {
     final refreshToken =
-        await apiConfig.appCache?.read(CacheEnum.refresh) ??
-        'B268B7F278F295EC7DF8221B53959D6D6A83FF8779FDC475CAB0BA0B75592CA5';
-
+        await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
     if (refreshToken.isNotEmpty) {
       final response = await http.Client().post(
         url.replace(path: 'Auths/MobileUser/RefreshToken'),
@@ -86,7 +83,10 @@ mixin RefreshTokenMixin {
           body['data'] as Map<String, dynamic>,
         );
         await apiConfig.appCache?.saveAll(
-          CacheEnum.saveToken(token.accessToken, token.refreshToken),
+          CacheKeyBundle.tokenPair(
+            access: token.accessToken,
+            refresh: token.refreshToken,
+          ),
         );
         return token;
       }
@@ -94,9 +94,11 @@ mixin RefreshTokenMixin {
     return null;
   }
   Future<Map<String, String>> defaultHeaders() async {
-    final token = await apiConfig.appCache?.read(CacheEnum.token) ?? '';
-    final lan = await apiConfig.appCache?.read(CacheEnum.lang) ?? 'ru';
-    final versionCode = await apiConfig.appCache?.read(CacheEnum.versionCode);
+    final token =
+        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
+    final lan = await apiConfig.appCache?.read(CoreCacheKey.language) ?? 'ru';
+    final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
+    
     return {
       HttpHeaders.contentTypeHeader: HttpHeadersConst.contentTypeJson,
       HttpHeaders.acceptHeader: HttpHeadersConst.contentTypeJson,
