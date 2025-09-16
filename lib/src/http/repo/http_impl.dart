@@ -21,10 +21,8 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   final ApiConfig _apiConfig;
 
   late Client _client;
-  late ErrorResponse _errorResponseToJson;
-
+ 
   void _init() {
-    _errorResponseToJson = ErrorResponse();
     HttpOverrides.global = CustomHttpOverrides(bpHost: _apiConfig.apiUrl.host);
     final retryClient = RetryClient(
       Client(),
@@ -256,7 +254,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         }
         return Failure<T, E>(
           exception(
-            _errorResponseToJson
+            errorResponseToJson
                 .copyWith(
                   status: response.statusCode,
                   reasonPhrase: response.reasonPhrase,
@@ -288,7 +286,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         }
         return Failure<T, E>(
           exception(
-            _errorResponseToJson
+            errorResponseToJson
                 .copyWith(
                   status: response.statusCode,
                   reasonPhrase: response.reasonPhrase,
@@ -305,7 +303,8 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
  
 
   @override
-  ErrorResponse get errorResponseToJson => _errorResponseToJson;
+  IBaseErrorResponse get errorResponseToJson =>
+      _apiConfig.errorResponseFactory();
 
  
   

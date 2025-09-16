@@ -21,7 +21,7 @@ final class HttpHeadersConst {
 
 mixin RefreshTokenMixin {
   ApiConfig get apiConfig;
-  ErrorResponse get errorResponseToJson;
+  IBaseErrorResponse get errorResponseToJson;
 
   http.Client get httpClient;
 
@@ -195,7 +195,7 @@ mixin RefreshTokenMixin {
   Failure<T, E> onExceptionError<T, E extends Exception>(
     Object e,
     FromJsonFun<E> errorFromJson,
-    ErrorResponse errorData,
+    IBaseErrorResponse errorData,
   ) {
     final status = e is SocketException
         ? HttpStatus.serviceUnavailable

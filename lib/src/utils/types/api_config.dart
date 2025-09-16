@@ -1,4 +1,5 @@
 import '../../../mobile_api.dart';
+typedef ErrorResponseFactory = IBaseErrorResponse Function();
 
 final class ApiConfig {
   final Uri apiUrl;
@@ -10,6 +11,7 @@ final class ApiConfig {
   final String refreshTokenPath;
   final String loggerPath;
   final String defaultLanguage;
+  final ErrorResponseFactory errorResponseFactory;
 
 
   ApiConfig({
@@ -22,7 +24,12 @@ final class ApiConfig {
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
+    this.errorResponseFactory = _defaultErrorFactory,
+
   });
+  static IBaseErrorResponse _defaultErrorFactory() =>
+      const DefaultErrorResponse();
+
 }
 
 /// Configuration for paginated GraphQL container keys.
