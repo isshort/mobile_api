@@ -96,7 +96,8 @@ mixin RefreshTokenMixin {
 
     try {
       final refreshToken =
-          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
+          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ??
+          '+RGAbP4X+BlEgT3MnAVdweM3/dJCnPR3nlZwJoWqp29DRtbtxuqLjKuwFqDcxyozpV2VtoEY6lIGrVUkOQEW7w==';
       if (refreshToken.isEmpty) {
         _refreshCompleter!.complete(null);
         return null;

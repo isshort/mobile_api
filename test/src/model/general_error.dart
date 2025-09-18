@@ -16,6 +16,8 @@ final class GeneralError implements IBaseErrorResponse {
   @override
   final String? detail;
 
+
+
   GeneralError({this.status, this.errors, this.reasonPhrase, this.detail});
 
   @override
@@ -32,9 +34,10 @@ final class GeneralError implements IBaseErrorResponse {
   );
 
   factory GeneralError.fromJson(Map<String, dynamic> json) => GeneralError(
-    reasonPhrase: json['code'] as String?,
-    errors: json['property'],
-    detail: json['description'] as String?,
+    status: json['status'] as int?,
+    reasonPhrase: json['reasonPhrase'] as String? ?? json['code'] as String?,
+    errors: json['errors'] ?? json['property'],
+    detail: json['description'] as String? ?? json['description'] as String?,
   );
 
   @override

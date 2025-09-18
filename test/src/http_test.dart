@@ -18,7 +18,7 @@ class AppInit {
         marketplaceValue: 'ml',
         userAgentValue: 'mlApp',
         loggerPath: 'logger',
-        refreshTokenPath: 'accounts/refresh',
+        refreshTokenPath: '/api/accounts/refresh',
       ),
     );
   }
@@ -68,7 +68,33 @@ void main() {
 
       expect(value, isA<GeneralError>());
     });
-    test('Shipper Register', () async {
+    test('register shipper', () async {
+      const body = ShipperRegister(
+        email: 'test2@gmail.com',
+        password: '1234qwerASDF',
+        fullName: 'Test User',
+        tinOrNationalID: '123456789',
+        phoneNumber: '1234567890',
+        companyLicense: 'ABC123',
+        location: 'Test Location',
+        regionServed: 'Test Region',
+      );
+      final response = await iHttp.baseMethod(
+        '/api/shipper',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.post,
+        body: body.toJson(),
+      );
+
+      final value = switch (response) {
+        Success(value: final value) => value,
+        Failure(exception: final exception) => exception,
+      };
+
+      expect(value, isA<ShipperRegister>());
+    });
+    test('method not allowed', () async {
       const body = ShipperRegister(
         email: 'test@gmail.com',
         password: '1234qwerASDF',
@@ -92,7 +118,25 @@ void main() {
         Failure(exception: final exception) => exception,
       };
 
-      expect(value, isA<ShipperRegister>());
+      expect(value, isA<GeneralError>());
+    });
+
+    /// shipper get method list
+
+    test('shipper get method list', () async {
+      final response = await iHttp.baseMethod(
+        '/api/shipper',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.get,
+      );
+
+      final value = switch (response) {
+        Success(value: final value) => value,
+        Failure(exception: final exception) => exception,
+      };
+
+      expect(value, isA<GeneralError>());
     });
   });
 }
