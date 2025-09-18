@@ -22,7 +22,7 @@ void main() {
       () => mockStorage.read(key: any(named: 'key')),
     ).thenAnswer((_) async => 'stored_value');
 
-    final result = await cacheRepo.read(CacheEnum.token);
+    final result = await cacheRepo.read(CoreCacheKey.accessToken);
 
     expect(result, 'stored_value');
 

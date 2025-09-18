@@ -22,7 +22,7 @@ final class IBOAuth2Token {
   final String? scope;
 
   Map<String, String> tokenToJson() => <String, String>{
-    CacheEnum.token.name: accessToken,
-    CacheEnum.refresh.name: refreshToken,
+    CoreCacheKey.accessToken.value: accessToken,
+    CoreCacheKey.refreshToken.value: refreshToken,
   };
 }

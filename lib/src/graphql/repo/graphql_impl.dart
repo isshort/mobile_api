@@ -6,7 +6,6 @@ import 'package:graphql/client.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../mobile_api.dart';
-import '../../utils/types/api_config.dart';
 
 final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   IGraphQlImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
@@ -18,16 +17,13 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   /// late variables
   late GraphQLClient _client;
   late CustomFreshLink<IBOAuth2Token> _freshLink;
-  final _errorResponseToJson = ErrorResponse();
-
-  @override
-  ErrorResponse get errorResponseToJson => _errorResponseToJson;
-
+ 
+ 
   void _init() {
     _freshLink = CustomFreshLink.oAuth2(
       tokenStorage: InMemoryTokenStorage(),
       refreshToken: (p0, p1) async {
-        final token = await updateRefreshToken(_apiConfig.apiUrl);
+        final token = await updateRefreshToken();
         return IBOAuth2Token(
           accessToken: token?.accessToken ?? '',
           refreshToken: token?.refreshToken ?? '',
@@ -102,10 +98,14 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         return errorGraphQlResponse(
           errorFromJson,
           request,
-          _errorResponseToJson,
+          errorResponseToJson,
         );
       }
-      return request.responseQueryDetail<R, E>(dataFromJson, field);
+      return request.responseQueryDetail<R, E>(
+        field: field,
+        fromJson: dataFromJson,
+        keys: apiConfig.pageFieldKeys,
+      );
     }, errorFromJson);
   }
 
@@ -123,14 +123,14 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         return errorGraphQlResponse(
           errorFromJson,
           request,
-          _errorResponseToJson,
+          errorResponseToJson,
         );
       }
       final response = request.responseMultipleQuery<R, E>(dataFromJson);
       if (response != null) return response;
       return Failure(
         errorFromJson(
-          _errorResponseToJson
+          errorResponseToJson
               .copyWith(status: 503, reasonPhrase: 'Bad request')
               .toJson(),
         ),
@@ -160,7 +160,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         return errorGraphQlResponse(
           errorFromJson,
           request,
-          _errorResponseToJson,
+          errorResponseToJson,
         );
       }
       return request.responseDetail<R, E>(dataFromJson, field);
@@ -182,7 +182,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         return errorGraphQlResponse(
           errorFromJson,
           request,
-          _errorResponseToJson,
+          errorResponseToJson,
         );
       }
       return request.responseList<R, E>(dataFromJson, field);
@@ -204,7 +204,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         return errorGraphQlResponse(
           errorFromJson,
           request,
-          _errorResponseToJson,
+          errorResponseToJson,
         );
       }
       return request.responseList<R, E>(dataFromJson, field);
@@ -214,7 +214,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   Failure<R, E> errorGraphQlResponse<R, E extends Exception>(
     ErrorFromJson<E> errorJson,
     QueryResult<Object?> request,
-    ErrorResponse errorData,
+    IBaseErrorResponse errorData,
   ) {
     final result = switch (request.exception) {
       HttpLinkParserException(response: final response) =>
@@ -267,7 +267,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     Response? response,
     int? statusCode,
     ErrorFromJson<E> errorJson,
-    ErrorResponse errorData,
+    IBaseErrorResponse errorData,
   ) {
     addLogger(response?.errors?.first.errorFullMessage);
     return Failure(
@@ -284,7 +284,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
 
   Failure<R, E> _responseOperational<R, E extends Exception>({
     required ErrorFromJson<E> errorJson,
-    required ErrorResponse errorData,
+    required IBaseErrorResponse errorData,
     LinkException? linkException,
     List<GraphQLError>? graphErrors,
   }) {
@@ -342,4 +342,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
 
   @override
   ApiConfig get apiConfig => _apiConfig;
+  final _rawClient = http.Client();
+  @override
+  http.Client get httpClient => _rawClient;
+  
+  @override
+  IBaseErrorResponse get errorResponseToJson =>
+      _apiConfig.errorResponseFactory();
 }

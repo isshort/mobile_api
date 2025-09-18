@@ -8,7 +8,6 @@ import 'package:http/retry.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
-import '../../utils/types/api_config.dart';
 
 
 
@@ -22,10 +21,8 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   final ApiConfig _apiConfig;
 
   late Client _client;
-  late ErrorResponse _errorResponseToJson;
-
+ 
   void _init() {
-    _errorResponseToJson = ErrorResponse();
     HttpOverrides.global = CustomHttpOverrides(bpHost: _apiConfig.apiUrl.host);
     final retryClient = RetryClient(
       Client(),
@@ -42,12 +39,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     BaseResponse? res,
     dynamic retryCount,
   ) async {
-    final token = await updateRefreshToken(_apiConfig.apiUrl);
+    final token = await updateRefreshToken();
     req.headers[HttpHeadersConst.authorization] =
         '${HttpHeadersConst.bearer} ${token?.accessToken}';
     req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
     req.headers[HttpHeadersConst.userAgent] =
-        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CacheEnum.versionCode)}';
+        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CoreCacheKey.appVersion)}';
 
     return;
   }
@@ -257,7 +254,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         }
         return Failure<T, E>(
           exception(
-            _errorResponseToJson
+            errorResponseToJson
                 .copyWith(
                   status: response.statusCode,
                   reasonPhrase: response.reasonPhrase,
@@ -289,7 +286,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         }
         return Failure<T, E>(
           exception(
-            _errorResponseToJson
+            errorResponseToJson
                 .copyWith(
                   status: response.statusCode,
                   reasonPhrase: response.reasonPhrase,
@@ -306,10 +303,13 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
  
 
   @override
-  ErrorResponse get errorResponseToJson => _errorResponseToJson;
+  IBaseErrorResponse get errorResponseToJson =>
+      _apiConfig.errorResponseFactory();
 
  
   
   @override
   ApiConfig get apiConfig => _apiConfig;
+  @override
+  http.Client get httpClient => _client;
 }
