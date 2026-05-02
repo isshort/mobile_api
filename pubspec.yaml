@@ -1,6 +1,6 @@
 name: mobile_api
 description: "mobile api package for moam digital system"
-version: 0.0.2+3
+version: 0.0.3+10
 homepage: https://github.com/moamlogistics/mobile_api
 repository: https://github.com/moamlogistics/mobile_api
 
