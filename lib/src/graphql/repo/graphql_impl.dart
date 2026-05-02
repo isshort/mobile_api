@@ -17,8 +17,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   /// late variables
   late GraphQLClient _client;
   late CustomFreshLink<IBOAuth2Token> _freshLink;
- 
- 
+
   void _init() {
     _freshLink = CustomFreshLink.oAuth2(
       tokenStorage: InMemoryTokenStorage(),
@@ -48,12 +47,14 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   }
 
   Future<void> _getHeaders() async {
-    // await _freshLink.setToken(
-    //   IBOAuth2Token(
-    //     accessToken: await _appCache?.read(CacheEnum.token) ?? '',
-    //     refreshToken: await _appCache?.read(CacheEnum.refresh) ?? '',
-    //   ),
-    // );
+    await _freshLink.setToken(
+      IBOAuth2Token(
+        accessToken:
+            await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? TOKEN,
+        refreshToken:
+            await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '',
+      ),
+    );
     _client = _client.copyWith(
       link: Link.from([
         _freshLink,
@@ -70,10 +71,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     required String path,
     Map<String, dynamic>? variables,
     DurationEnum? timeout,
-  }) {
-    return _client
+  }) async {
+    final ok = await _client
         .query(_queryOptions(path, params: variables))
         .timeout(timeout?.duration ?? DurationEnum.medium.duration);
+    return ok;
   }
 
   @override
@@ -345,7 +347,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   final _rawClient = http.Client();
   @override
   http.Client get httpClient => _rawClient;
-  
+
   @override
   IBaseErrorResponse get errorResponseToJson =>
       _apiConfig.errorResponseFactory();

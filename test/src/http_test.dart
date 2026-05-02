@@ -22,12 +22,31 @@ class AppInit {
       ),
     );
   }
+
+  static IGraphQl graphInit() {
+    return IGraphQlImpl(
+      apiConfig: ApiConfig(
+        apiUrl: Uri(
+          scheme: 'http',
+          host: 'applications.moamlogistics.com',
+          port: 9090,
+          path: '/graphql',
+        ),
+        marketplaceValue: 'ml',
+        userAgentValue: 'mlApp',
+        loggerPath: 'logger',
+        refreshTokenPath: '/api/accounts/refresh',
+      ),
+    );
+  }
 }
 
 void main() {
   late IHttp iHttp;
+  late IGraphQl iGraphQl;
   setUp(() {
     iHttp = AppInit.httpInit();
+    iGraphQl = AppInit.graphInit();
   });
 
   group('Auth Test', () {
@@ -124,11 +143,35 @@ void main() {
     /// shipper get method list
 
     test('shipper get method list', () async {
-      final response = await iHttp.baseMethod(
-        '/api/shipper',
+      final shipperPath = '''
+query getShippers {
+  shippers {
+    totalCount
+    pageInfo {
+      hasNextPage
+    }
+    items {
+      userId
+      fullName
+      tinOrNationalID
+      phoneNumber
+      email
+      companyLicence
+      location
+      regionServed
+    }
+  }
+}
+''';
+
+      final simple = await iGraphQl.simpleQuery(path: shipperPath);
+      print(simple);
+
+      final response = await iGraphQl.queryList(
+        field: 'shippers',
         dataFromJson: ShipperRegister.fromJson,
         errorFromJson: GeneralError.fromJson,
-        requestType: RequestType.get,
+        path: shipperPath,
       );
 
       final value = switch (response) {

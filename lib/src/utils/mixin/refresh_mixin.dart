@@ -19,6 +19,8 @@ final class HttpHeadersConst {
   static const acceptLanguage = 'Accept-Language';
 }
 
+const TOKEN =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2NDBhMi1jZTY0LTQzOTYtODAzZC1lMjQ5YzkwMmYwYjIiLCJlbWFpbCI6InN0cmluZ0BnbWFpbC5jb20iLCJqdGkiOiJiYzhjNTEzNi0xMDg4LTQ2YTAtYWY4MC1mZjUwYmIzZWUyOWYiLCJpYXQiOjE3NTgxOTE1NzksImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlNoaXBwZXIiLCJuYmYiOjE3NTgxOTE1NzksImV4cCI6MTc1ODE5NTE3OSwiaXNzIjoiQ2FyZ29TZXJ2aWNlQXV0aCIsImF1ZCI6IkNhcmdvU2VydmljZUFQSSJ9.zsRSCVM7ZqYNTNiuIihBaGzsjQrSi01U68NN-eAS9ZU';
 mixin RefreshTokenMixin {
   ApiConfig get apiConfig;
   IBaseErrorResponse get errorResponseToJson;
@@ -96,8 +98,7 @@ mixin RefreshTokenMixin {
 
     try {
       final refreshToken =
-          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ??
-          '+RGAbP4X+BlEgT3MnAVdweM3/dJCnPR3nlZwJoWqp29DRtbtxuqLjKuwFqDcxyozpV2VtoEY6lIGrVUkOQEW7w==';
+          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
       if (refreshToken.isEmpty) {
         _refreshCompleter!.complete(null);
         return null;
@@ -107,9 +108,8 @@ mixin RefreshTokenMixin {
           ? rawPath.substring(1)
           : rawPath;
       final uri = (apiConfig.apiUrl).replace(path: normalized);
-
       final response = await httpClient.post(
-        uri,
+        uri.replace(port: 9091),
         headers: await defaultHeaders(),
         body: jsonEncode(buildRefreshBody(refreshToken)),
       );
@@ -160,7 +160,7 @@ mixin RefreshTokenMixin {
 
   Future<Map<String, String>> defaultHeaders() async {
     final token =
-        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
+        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? TOKEN;
     final lan = await apiConfig.appCache?.read(CoreCacheKey.language) ?? 'ru';
     final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
 
@@ -191,7 +191,6 @@ mixin RefreshTokenMixin {
       // Intentionally swallow logging errors.
     }
   }
-
 
   Failure<T, E> onExceptionError<T, E extends Exception>(
     Object e,
