@@ -19,8 +19,8 @@ final class HttpHeadersConst {
   static const acceptLanguage = 'Accept-Language';
 }
 
-const TOKEN =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2NDBhMi1jZTY0LTQzOTYtODAzZC1lMjQ5YzkwMmYwYjIiLCJlbWFpbCI6InN0cmluZ0BnbWFpbC5jb20iLCJqdGkiOiJiYzhjNTEzNi0xMDg4LTQ2YTAtYWY4MC1mZjUwYmIzZWUyOWYiLCJpYXQiOjE3NTgxOTE1NzksImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlNoaXBwZXIiLCJuYmYiOjE3NTgxOTE1NzksImV4cCI6MTc1ODE5NTE3OSwiaXNzIjoiQ2FyZ29TZXJ2aWNlQXV0aCIsImF1ZCI6IkNhcmdvU2VydmljZUFQSSJ9.zsRSCVM7ZqYNTNiuIihBaGzsjQrSi01U68NN-eAS9ZU';
+const ACCESS_TOKEN =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZDZhY2Q0Zi0wZDdkLTRkNTEtOGViOC0wMWQ2Y2E0NTY4YTYiLCJuYW1lIjoiTmFtYXR1bGxhaFdhaGlkaSIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWVpZGVudGlmaWVyIjoiMGQ2YWNkNGYtMGQ3ZC00ZDUxLThlYjgtMDFkNmNhNDU2OGE2IiwiZW1haWwiOiIiLCJqdGkiOiI2ODRiMGEwOC0zNThmLTQwMjItOGM2Ny0wMGE0ZGMzNjkyZjIiLCJpYXQiOjE3NjkyMzkwMzUsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkNvdXJpZXJfQ3VzdG9tZXIiLCJuYmYiOjE3NjkyMzkwMzUsImV4cCI6MTc2OTI0MjYzNSwiaXNzIjoiQ2FyZ29TZXJ2aWNlQXV0aCIsImF1ZCI6IkNhcmdvU2VydmljZUFQSSJ9.p-UlpraKWHDX8O-50L7wf2PgjcTNabFl5iuOT2AcK0k";
 mixin RefreshTokenMixin {
   ApiConfig get apiConfig;
   IBaseErrorResponse get errorResponseToJson;
@@ -28,7 +28,7 @@ mixin RefreshTokenMixin {
   http.Client get httpClient;
 
   String get refreshTokenPath => apiConfig.refreshTokenPath;
-  String get loggerPath => apiConfig.loggerPath;
+  String? get loggerPath => apiConfig.loggerPath;
 
   /// Concurrency guard so only one refresh runs at a time.
   static Completer<IBOAuth2Token?>? _refreshCompleter;
@@ -98,7 +98,8 @@ mixin RefreshTokenMixin {
 
     try {
       final refreshToken =
-          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
+          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ??
+          'I3RXQ/CxhycUgHGEkTEn3AMe/f1SlfrrZbvkx4cEWPb10e48niQTlpiwCsxB9nUKSCddw8EHl8648Tu/ZWCU7w==';
       if (refreshToken.isEmpty) {
         _refreshCompleter!.complete(null);
         return null;
@@ -108,8 +109,9 @@ mixin RefreshTokenMixin {
           ? rawPath.substring(1)
           : rawPath;
       final uri = (apiConfig.apiUrl).replace(path: normalized);
+
       final response = await httpClient.post(
-        uri.replace(port: 9091),
+        uri,
         headers: await defaultHeaders(),
         body: jsonEncode(buildRefreshBody(refreshToken)),
       );
@@ -160,7 +162,8 @@ mixin RefreshTokenMixin {
 
   Future<Map<String, String>> defaultHeaders() async {
     final token =
-        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? TOKEN;
+        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ??
+        ACCESS_TOKEN;
     final lan = await apiConfig.appCache?.read(CoreCacheKey.language) ?? 'ru';
     final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
 
@@ -176,8 +179,9 @@ mixin RefreshTokenMixin {
   }
 
   Future<void> addLogger(String? loggerMessage) async {
+    if (loggerPath == null) return;
     if (loggerMessage == null || loggerMessage.isEmpty) return;
-    final raw = loggerPath.trim();
+    final raw = loggerPath!.trim();
     if (raw.isEmpty) return; // logging disabled if path blank
     final path = raw.startsWith('/') ? raw.substring(1) : raw;
     final uri = apiConfig.apiUrl.replace(path: path);

@@ -9,19 +9,15 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
 
-
-
 final class IHttpImpl extends IHttp with RefreshTokenMixin {
-  IHttpImpl({
-    required ApiConfig apiConfig}) : _apiConfig = apiConfig {
-
+  IHttpImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
     _init();
   }
- 
+
   final ApiConfig _apiConfig;
 
   late Client _client;
- 
+
   void _init() {
     HttpOverrides.global = CustomHttpOverrides(bpHost: _apiConfig.apiUrl.host);
     final retryClient = RetryClient(
@@ -64,8 +60,39 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     }
     return SimpleResult(result.statusCode, result.body);
   }
- 
 
+  @override
+  Future<Result<S, E>> postIntegra<S, E extends Exception>({
+    required FromJsonFun<S> dataFromJson,
+    required ErrorFromJson<E> errorFromJson,
+    MapParam? params,
+    String? query,
+    Uri? url,
+    String? path,
+    Map<String, dynamic>? body,
+  }) async {
+    final headers = await defaultHeaders();
+    dynamic requestBody = body;
+    Map<String, String> modHeaders = Map.from(headers);
+    if (body != null) {
+      requestBody = jsonEncode(body);
+      modHeaders['Content-Type'] = 'application/json';
+    }
+    final response = await http.post(
+      url ?? _apiConfig.apiUrl.replace(path: path, queryParameters: params),
+      headers: modHeaders,
+      body: requestBody,
+    );
+    final decodeJson =
+        CustomJsonDecoder.decode(response.body) as Map<String, dynamic>?;
+    final statusCode = decodeJson != null && decodeJson.containsKey('Code')
+        ? decodeJson['Code']
+        : null;
+    if (statusCode == "1") {
+      return Success(dataFromJson(decodeJson ?? {}));
+    }
+    return Failure(errorFromJson(decodeJson ?? {}));
+  }
 
   @override
   Future<Result<S, E>> baseMethod<S, E extends Exception>(
@@ -108,14 +135,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         body: body,
       );
       return customHttpResponseType<S, E>(
-          dataFromJson: dataFromJson,
-          exception: errorFromJson,
+        dataFromJson: dataFromJson,
+        exception: errorFromJson,
         response: response,
       );
     }, errorFromJson);
   }
-
-
 
   @override
   Future<Result<S, E>?> multipart<S, E extends Exception>(
@@ -131,7 +156,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     final request = await _createMultipartRequest(
       httpMethod?.value ?? RequestType.post.value,
       uri,
- 
+
       fields: body,
       files: files != null
           ? {
@@ -148,21 +173,19 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
           : null,
     );
     final response = await request.send();
-    String? responseBody;
-    final stream = response.stream.transform(utf8.decoder);
-    await for (final chunk in stream) {
-      responseBody = chunk;
-    }
-    if (responseBody == null) return null;
-    if (response.statusCode == HttpStatus.ok) {
+
+    final responseBody = await http.Response.fromStream(response);
+    if (responseBody.statusCode == 200 || responseBody.statusCode == 201) {
       return Success(
-        successFromJson(CustomJsonDecoder.toJsonData(responseBody)),
+        successFromJson(CustomJsonDecoder.toJsonData(responseBody.body)),
       );
     }
-    await addLogger(responseBody);
-    return Failure(errorFromJson(CustomJsonDecoder.toJsonData(responseBody)));
+    await addLogger(responseBody.reasonPhrase);
+    return Failure(
+      errorFromJson(CustomJsonDecoder.toJsonData(responseBody.body)),
+    );
   }
-  
+
   Future<MultipartRequest> _createMultipartRequest(
     String method,
     Uri uri, {
@@ -300,14 +323,10 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     return statusResult;
   }
 
- 
-
   @override
   IBaseErrorResponse get errorResponseToJson =>
       _apiConfig.errorResponseFactory();
 
- 
-  
   @override
   ApiConfig get apiConfig => _apiConfig;
   @override

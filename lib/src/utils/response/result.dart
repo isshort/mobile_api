@@ -16,5 +16,5 @@ final class Failure<S, E extends Exception> extends Result<S, E> {
 final class SimpleResult {
   SimpleResult(this.statusCode, this.body);
   final int statusCode;
-  final String body;
+  final dynamic body;
 }

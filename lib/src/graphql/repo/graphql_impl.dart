@@ -50,9 +50,10 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     await _freshLink.setToken(
       IBOAuth2Token(
         accessToken:
-            await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? TOKEN,
+            await _apiConfig.appCache?.read(CoreCacheKey.accessToken) ??
+            ACCESS_TOKEN,
         refreshToken:
-            await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '',
+            await _apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '',
       ),
     );
     _client = _client.copyWith(
@@ -71,17 +72,18 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     required String path,
     Map<String, dynamic>? variables,
     DurationEnum? timeout,
-  }) async {
-    final ok = await _client
+  }) {
+    return _client
         .query(_queryOptions(path, params: variables))
         .timeout(timeout?.duration ?? DurationEnum.medium.duration);
-    return ok;
   }
 
   @override
   Future<QueryResult<Object?>?> simpleQuery({required String path}) async {
     await _getHeaders();
-    final result = await _client.query<dynamic>(_queryOptions(path));
+    final result = await _client.query<dynamic>(
+      _queryOptions(path, params: {'page': 0, 'limit': 20}),
+    );
     return result;
   }
 
@@ -187,7 +189,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
           errorResponseToJson,
         );
       }
-      return request.responseList<R, E>(dataFromJson, field);
+      return request.responseList<R, E>(
+        fromJson: dataFromJson,
+        field: field,
+        keys: apiConfig.pageFieldKeys,
+      );
     }, errorFromJson);
   }
 
@@ -209,7 +215,11 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
           errorResponseToJson,
         );
       }
-      return request.responseList<R, E>(dataFromJson, field);
+      return request.responseList<R, E>(
+        fromJson: dataFromJson,
+        field: field,
+        keys: apiConfig.pageFieldKeys,
+      );
     }, errorFromJson);
   }
 

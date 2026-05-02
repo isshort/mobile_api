@@ -1,4 +1,5 @@
 import '../../../mobile_api.dart';
+
 typedef ErrorResponseFactory = IBaseErrorResponse Function();
 
 final class ApiConfig {
@@ -9,27 +10,52 @@ final class ApiConfig {
   final ICacheRepo? appCache;
   final PageFieldKeys pageFieldKeys;
   final String refreshTokenPath;
-  final String loggerPath;
+  final String? loggerPath;
   final String defaultLanguage;
   final ErrorResponseFactory errorResponseFactory;
-
 
   ApiConfig({
     required this.apiUrl,
     required this.marketplaceValue,
     required this.userAgentValue,
     required this.refreshTokenPath,
-    required this.loggerPath,
+    this.loggerPath,
     this.defaultLanguage = 'en',
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
     this.errorResponseFactory = _defaultErrorFactory,
-
   });
+
+  // copywith
+  ApiConfig copyWith({
+    Uri? apiUrl,
+    String? marketplaceValue,
+    String? userAgentValue,
+    CheckNetwork? checkNetwork,
+    ICacheRepo? appCache,
+    PageFieldKeys? pageFieldKeys,
+    String? refreshTokenPath,
+    String? loggerPath,
+    String? defaultLanguage,
+    ErrorResponseFactory? errorResponseFactory,
+  }) {
+    return ApiConfig(
+      apiUrl: apiUrl ?? this.apiUrl,
+      marketplaceValue: marketplaceValue ?? this.marketplaceValue,
+      userAgentValue: userAgentValue ?? this.userAgentValue,
+      checkNetwork: checkNetwork ?? this.checkNetwork,
+      appCache: appCache ?? this.appCache,
+      pageFieldKeys: pageFieldKeys ?? this.pageFieldKeys,
+      refreshTokenPath: refreshTokenPath ?? this.refreshTokenPath,
+      loggerPath: loggerPath ?? this.loggerPath,
+      defaultLanguage: defaultLanguage ?? this.defaultLanguage,
+      errorResponseFactory: errorResponseFactory ?? this.errorResponseFactory,
+    );
+  }
+
   static IBaseErrorResponse _defaultErrorFactory() =>
       const DefaultErrorResponse();
-
 }
 
 /// Configuration for paginated GraphQL container keys.

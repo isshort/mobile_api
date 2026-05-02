@@ -1,7 +1,5 @@
-
 import 'package:mobile_api/src/utils/response/result.dart';
 import 'package:mobile_api/src/utils/types/types.dart';
-
 
 extension QueryPage on QueryResponse {
   Map<String, dynamic>? _asMap(String key) {
@@ -45,8 +43,7 @@ extension QueryPage on QueryResponse {
     );
   }
 
-  Success<R, E> responseQueryDetail<R, E extends Exception>(
-    {
+  Success<R, E> responseQueryDetail<R, E extends Exception>({
     required FromJsonFun<R> fromJson,
     required String field,
     required PageFieldKeys keys,
@@ -62,13 +59,14 @@ extension QueryPage on QueryResponse {
     return Success(fromJson(const {}));
   }
 
-  Result<List<R>, E> responseList<R, E extends Exception>(
-    FromJsonFun<R> fromJson,
-    String field,
-  ) {
-    final value = data?[field];
-    if (value is List) {
-      final mapped = value
+  Result<List<R>, E> responseList<R, E extends Exception>({
+    required FromJsonFun<R> fromJson,
+    required String field,
+    required PageFieldKeys keys,
+  }) {
+    final paged = pageItems(field: field, keys: keys);
+    if (paged.isNotEmpty && paged.first is Map<String, dynamic>) {
+      final mapped = paged
           .whereType<Map<String, dynamic>>()
           .map(fromJson)
           .toList();
