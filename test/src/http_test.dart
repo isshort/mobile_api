@@ -9,14 +9,18 @@ import 'model/auth_response.dart';
 import 'model/general_error.dart';
 import 'model/shipper_register.dart';
 
-ApiConfig _config({String path = ''}) {
+ApiConfig _config({String path = '', ICacheRepo? appCache}) {
   return ApiConfig(
     apiUrl: Uri(scheme: 'https', host: 'api.example.test', path: path),
     marketplaceValue: 'ml',
     userAgentValue: 'mlApp',
     refreshTokenPath: '/api/accounts/refresh',
+    appCache: appCache,
   );
 }
+
+InMemoryCacheRepo _tokenCache(String token) =>
+    InMemoryCacheRepo({CoreCacheKey.accessToken: token});
 
 void main() {
   group('IHttpImpl', () {
@@ -92,6 +96,37 @@ void main() {
       expect(response.statusCode, 200);
       expect(response.body, 'ok');
     });
+
+    test('sends Authorization header when token is supplied via InMemoryCacheRepo', () async {
+      final client = MockClient((request) async {
+        expect(
+          request.headers[HttpHeadersConst.authorization],
+          '${HttpHeadersConst.bearer} test-token',
+        );
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'new-token',
+            'userId': 'u1',
+            'email': 'a@b.com',
+            'roles': [],
+          }),
+          200,
+        );
+      });
+      final api = IHttpImpl(
+        apiConfig: _config(appCache: _tokenCache('test-token')),
+        httpClient: client,
+      );
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/me',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.get,
+      );
+
+      expect(response, isA<Success<AuthResponse, GeneralError>>());
+    });
   });
 
   group('IGraphQlImpl', () {
@@ -145,6 +180,40 @@ query getShippers {
       final success = response as Success<List<ShipperRegister>, GeneralError>;
       expect(success.value, hasLength(1));
       expect(success.value.first.email, 'shipper@example.test');
+    });
+
+    test('sends Authorization header when token is supplied via InMemoryCacheRepo', () async {
+      final client = MockClient((request) async {
+        expect(
+          request.headers[HttpHeadersConst.authorization],
+          '${HttpHeadersConst.bearer} gql-token',
+        );
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'shippers': {
+                'pageInfo': {'hasNextPage': false},
+                'items': [],
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = IGraphQlImpl(
+        apiConfig: _config(path: '/graphql', appCache: _tokenCache('gql-token')),
+        httpClient: client,
+      );
+
+      final response = await api.queryList<ShipperRegister, GeneralError>(
+        field: 'shippers',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        path: 'query { shippers { pageInfo { hasNextPage } items { email } } }',
+      );
+
+      expect(response, isA<Success<List<ShipperRegister>, GeneralError>>());
     });
   });
 }
