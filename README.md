@@ -17,7 +17,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  mobile_api: ^0.0.3+10
+  mobile_api: ^0.0.4+11
 ```
 
 Import it:

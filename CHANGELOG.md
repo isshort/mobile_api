@@ -1,4 +1,4 @@
-## 0.0.3+10
+## 0.0.4+11
 
 - Removed hard-coded token fallbacks from REST and GraphQL clients.
 - Made bad-certificate handling opt-in and scoped to the package HTTP clients.
