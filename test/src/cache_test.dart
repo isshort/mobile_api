@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_api/src/src.dart';
@@ -10,11 +9,9 @@ void main() {
   late MockSecureStorage mockStorage;
   late ICacheRepoImpl cacheRepo;
 
-  WidgetsFlutterBinding.ensureInitialized();
-
   setUp(() {
     mockStorage = MockSecureStorage();
-    cacheRepo = ICacheRepoImpl();
+    cacheRepo = ICacheRepoImpl(secureStorage: mockStorage);
   });
 
   test('read should return saved value', () async {
@@ -26,6 +23,8 @@ void main() {
 
     expect(result, 'stored_value');
 
-    verify(() => mockStorage.read(key: 'token')).called(1);
+    verify(
+      () => mockStorage.read(key: CoreCacheKey.accessToken.value),
+    ).called(1);
   });
 }

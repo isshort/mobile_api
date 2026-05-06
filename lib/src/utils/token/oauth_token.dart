@@ -13,7 +13,7 @@ class IBOAuth2Token {
     accessToken: json['accessToken'] as String,
     refreshToken: json['refreshToken'] as String,
 
-    tokenType: json['tokenType'] as String?,
+    tokenType: json['tokenType'] as String? ?? 'Bearer',
     expiresIn: json['expiresIn'] as int?,
     scope: json['scope'] as String?,
     roles: (json['roles'] as List<dynamic>?)?.map((e) => e as String).toList(),

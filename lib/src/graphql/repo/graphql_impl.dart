@@ -1,18 +1,21 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:fresh_graphql/fresh_graphql.dart';
 import 'package:graphql/client.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import '../../../mobile_api.dart';
 
 final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
-  IGraphQlImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
+  IGraphQlImpl({required ApiConfig apiConfig, http.Client? httpClient})
+    : _apiConfig = apiConfig,
+      _rawClient = httpClient ?? _createHttpClient(apiConfig) {
     _init();
   }
 
   final ApiConfig _apiConfig;
+  final http.Client _rawClient;
 
   /// late variables
   late GraphQLClient _client;
@@ -33,7 +36,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
       },
     );
     _client = GraphQLClient(
-      link: Link.from([_freshLink, HttpLink('${_apiConfig.apiUrl}')]),
+      link: Link.from([_freshLink, _httpLink()]),
       cache: GraphQLCache(),
     );
   }
@@ -47,24 +50,26 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   }
 
   Future<void> _getHeaders() async {
+    final accessToken =
+        await _apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
+    final refreshToken =
+        await _apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
     await _freshLink.setToken(
-      IBOAuth2Token(
-        accessToken:
-            await _apiConfig.appCache?.read(CoreCacheKey.accessToken) ??
-            ACCESS_TOKEN,
-        refreshToken:
-            await _apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '',
-      ),
+      accessToken.isEmpty
+          ? null
+          : IBOAuth2Token(accessToken: accessToken, refreshToken: refreshToken),
     );
     _client = _client.copyWith(
-      link: Link.from([
-        _freshLink,
-        HttpLink(
-          '${_apiConfig.apiUrl}',
-          defaultHeaders: await defaultHeaders(),
-        ),
-      ]),
+      link: Link.from([_freshLink, _httpLink(await defaultHeaders())]),
       cache: GraphQLCache(),
+    );
+  }
+
+  HttpLink _httpLink([Map<String, String> defaultHeaders = const {}]) {
+    return HttpLink(
+      '${_apiConfig.apiUrl}',
+      defaultHeaders: defaultHeaders,
+      httpClient: _rawClient,
     );
   }
 
@@ -266,9 +271,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     http.Response response,
     ErrorFromJson<E> errorJson,
   ) {
-    final jsonData = jsonDecode(response.body);
-    final mapData = jsonData as Map<String, dynamic>;
-
+    final mapData = CustomJsonDecoder.toJsonData(response.body);
     mapData['Status'] = response.statusCode;
     mapData['reasonPhrase'] = response.reasonPhrase;
     addLogger('${response.statusCode} ${response.reasonPhrase}');
@@ -281,13 +284,14 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     ErrorFromJson<E> errorJson,
     IBaseErrorResponse errorData,
   ) {
-    addLogger(response?.errors?.first.errorFullMessage);
+    final error = _firstGraphQlError(response?.errors);
+    addLogger(error?.errorFullMessage);
     return Failure(
       errorJson(
         errorData
             .copyWith(
               status: statusCode ?? HttpStatus.internalServerError,
-              errors: response?.errors?.first,
+              errors: error,
             )
             .toJson(),
       ),
@@ -322,21 +326,23 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     }
     if (linkException != null && linkException is ServerException) {
       final error = linkException;
-      addLogger(error.parsedResponse?.errors?.first.errorFullMessage);
+      final graphQlError = _firstGraphQlError(error.parsedResponse?.errors);
+      addLogger(graphQlError?.errorFullMessage);
       return Failure(
         errorJson(
           errorData
               .copyWith(
-                errors: error.parsedResponse?.errors?.first,
-                reasonPhrase: error.parsedResponse?.errors?.first.message,
+                errors: graphQlError,
+                reasonPhrase: graphQlError?.message,
                 status: error.statusCode,
               )
               .toJson(),
         ),
       );
     }
+    final graphQlError = _firstGraphQlError(graphErrors);
     addLogger(
-      graphErrors?.first.errorFullMessage ??
+      graphQlError?.errorFullMessage ??
           linkException.toString().subStringLongString,
     );
     return Failure(
@@ -344,7 +350,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
         errorData
             .copyWith(
               errors: GraphQLError(message: '$graphErrors $linkException'),
-              reasonPhrase: '$graphErrors',
+              reasonPhrase: graphQlError?.message ?? '$linkException',
               status: HttpStatus.badRequest,
             )
             .toJson(),
@@ -352,13 +358,24 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
     );
   }
 
+  GraphQLError? _firstGraphQlError(List<GraphQLError>? errors) {
+    if (errors == null || errors.isEmpty) return null;
+    return errors.first;
+  }
+
   @override
   ApiConfig get apiConfig => _apiConfig;
-  final _rawClient = http.Client();
   @override
   http.Client get httpClient => _rawClient;
 
   @override
   IBaseErrorResponse get errorResponseToJson =>
       _apiConfig.errorResponseFactory();
+
+  static http.Client _createHttpClient(ApiConfig apiConfig) {
+    if (!apiConfig.allowBadCertificates) return http.Client();
+    return IOClient(
+      CustomHttpOverrides(bpHost: apiConfig.apiUrl.host).createHttpClient(null),
+    );
+  }
 }

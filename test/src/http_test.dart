@@ -1,185 +1,150 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mobile_api/mobile_api.dart';
 
-import 'model/auth_request.dart';
 import 'model/auth_response.dart';
 import 'model/general_error.dart';
 import 'model/shipper_register.dart';
 
-class AppInit {
-  static IHttp httpInit() {
-    return IHttpImpl(
-      apiConfig: ApiConfig(
-        apiUrl: Uri(
-          scheme: 'http',
-          host: 'applications.moamlogistics.com',
-          port: 9090,
-        ),
-        marketplaceValue: 'ml',
-        userAgentValue: 'mlApp',
-        loggerPath: 'logger',
-        refreshTokenPath: '/api/accounts/refresh',
-      ),
-    );
-  }
-
-  static IGraphQl graphInit() {
-    return IGraphQlImpl(
-      apiConfig: ApiConfig(
-        apiUrl: Uri(
-          scheme: 'http',
-          host: 'applications.moamlogistics.com',
-          port: 9090,
-          path: '/graphql',
-        ),
-        marketplaceValue: 'ml',
-        userAgentValue: 'mlApp',
-        loggerPath: 'logger',
-        refreshTokenPath: '/api/accounts/refresh',
-      ),
-    );
-  }
+ApiConfig _config({String path = ''}) {
+  return ApiConfig(
+    apiUrl: Uri(scheme: 'https', host: 'api.example.test', path: path),
+    marketplaceValue: 'ml',
+    userAgentValue: 'mlApp',
+    refreshTokenPath: '/api/accounts/refresh',
+  );
 }
 
 void main() {
-  late IHttp iHttp;
-  late IGraphQl iGraphQl;
-  setUp(() {
-    iHttp = AppInit.httpInit();
-    iGraphQl = AppInit.graphInit();
+  group('IHttpImpl', () {
+    test('decodes successful JSON responses', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/shipper/login');
+        expect(request.headers[HttpHeadersConst.authorization], isNull);
+        expect(request.headers[HttpHeadersConst.marketplace], 'ml');
+
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'access-token',
+            'userId': 'user-id',
+            'email': 'shipper@example.test',
+            'roles': ['Shipper'],
+          }),
+          200,
+        );
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/shipper/login',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.post,
+        body: {'email': 'shipper@example.test', 'password': 'secret'},
+      );
+
+      expect(response, isA<Success<AuthResponse, GeneralError>>());
+      final success = response as Success<AuthResponse, GeneralError>;
+      expect(success.value.accessToken, 'access-token');
+    });
+
+    test('decodes error JSON responses', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'code': 'Invalid Credentials',
+            'description': 'Credentials are incorrect',
+          }),
+          400,
+          reasonPhrase: 'Bad Request',
+        );
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/shipper/login',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.post,
+        body: {'email': 'shipper@example.test', 'password': 'wrong'},
+      );
+
+      expect(response, isA<Failure<AuthResponse, GeneralError>>());
+      final failure = response as Failure<AuthResponse, GeneralError>;
+      expect(failure.exception.reasonPhrase, 'Invalid Credentials');
+      expect(failure.exception.detail, 'Credentials are incorrect');
+    });
+
+    test('builds GET requests from the configured base URL', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.toString(), 'https://api.example.test/users?page=1');
+        return http.Response('ok', 200);
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.get('/users', params: {'page': '1'});
+
+      expect(response.statusCode, 200);
+      expect(response.body, 'ok');
+    });
   });
 
-  group('Auth Test', () {
-    test('Shipper Login', () async {
-      const body = AuthRequest(
-        email: 'string@gmail.com',
-        password: '1234qwerASDF',
-      );
-      final response = await iHttp.baseMethod(
-        '/api/shipper/login',
-        dataFromJson: AuthResponse.fromJson,
-        errorFromJson: GeneralError.fromJson,
-        requestType: RequestType.post,
-        body: body.toJson(),
-      );
-
-      final value = switch (response) {
-        Success(value: final value) => value,
-        Failure(exception: final exception) => exception,
-      };
-
-      expect(value, isA<AuthResponse>());
-    });
-    test('Shipper Login Invalid', () async {
-      const body = AuthRequest(email: 'string@gmail.com', password: 'asdf');
-      final response = await iHttp.baseMethod(
-        '/api/shipper/login',
-        dataFromJson: AuthResponse.fromJson,
-        errorFromJson: GeneralError.fromJson,
-        requestType: RequestType.post,
-        body: body.toJson(),
-      );
-
-      final value = switch (response) {
-        Success(value: final value) => value,
-        Failure(exception: final exception) => exception,
-      };
-
-      expect(value, isA<GeneralError>());
-    });
-    test('register shipper', () async {
-      const body = ShipperRegister(
-        email: 'test2@gmail.com',
-        password: '1234qwerASDF',
-        fullName: 'Test User',
-        tinOrNationalID: '123456789',
-        phoneNumber: '1234567890',
-        companyLicense: 'ABC123',
-        location: 'Test Location',
-        regionServed: 'Test Region',
-      );
-      final response = await iHttp.baseMethod(
-        '/api/shipper',
-        dataFromJson: ShipperRegister.fromJson,
-        errorFromJson: GeneralError.fromJson,
-        requestType: RequestType.post,
-        body: body.toJson(),
+  group('IGraphQlImpl', () {
+    test('decodes paginated query lists without live network calls', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/graphql');
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'shippers': {
+                'pageInfo': {'hasNextPage': false},
+                'items': [
+                  {
+                    'fullName': 'Test User',
+                    'tinOrNationalID': '123456789',
+                    'phoneNumber': '1234567890',
+                    'email': 'shipper@example.test',
+                    'company_licence': 'ABC123',
+                    'location': 'Test Location',
+                    'regionServed': 'Test Region',
+                  },
+                ],
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = IGraphQlImpl(
+        apiConfig: _config(path: '/graphql'),
+        httpClient: client,
       );
 
-      final value = switch (response) {
-        Success(value: final value) => value,
-        Failure(exception: final exception) => exception,
-      };
-
-      expect(value, isA<ShipperRegister>());
-    });
-    test('method not allowed', () async {
-      const body = ShipperRegister(
-        email: 'test@gmail.com',
-        password: '1234qwerASDF',
-        fullName: 'Test User',
-        tinOrNationalID: '123456789',
-        phoneNumber: '1234567890',
-        companyLicense: 'ABC123',
-        location: 'Test Location',
-        regionServed: 'Test Region',
-      );
-      final response = await iHttp.baseMethod(
-        '/api/shipper/register',
-        dataFromJson: ShipperRegister.fromJson,
-        errorFromJson: GeneralError.fromJson,
-        requestType: RequestType.post,
-        body: body.toJson(),
-      );
-
-      final value = switch (response) {
-        Success(value: final value) => value,
-        Failure(exception: final exception) => exception,
-      };
-
-      expect(value, isA<GeneralError>());
-    });
-
-    /// shipper get method list
-
-    test('shipper get method list', () async {
-      final shipperPath = '''
-query getShippers {
-  shippers {
-    totalCount
-    pageInfo {
-      hasNextPage
-    }
-    items {
-      userId
-      fullName
-      tinOrNationalID
-      phoneNumber
-      email
-      companyLicence
-      location
-      regionServed
-    }
-  }
-}
-''';
-
-      final simple = await iGraphQl.simpleQuery(path: shipperPath);
-      print(simple);
-
-      final response = await iGraphQl.queryList(
+      final response = await api.queryList<ShipperRegister, GeneralError>(
         field: 'shippers',
         dataFromJson: ShipperRegister.fromJson,
         errorFromJson: GeneralError.fromJson,
-        path: shipperPath,
+        path: '''
+query getShippers {
+  shippers {
+    pageInfo { hasNextPage }
+    items { fullName email }
+  }
+}
+''',
       );
 
-      final value = switch (response) {
-        Success(value: final value) => value,
-        Failure(exception: final exception) => exception,
-      };
-
-      expect(value, isA<GeneralError>());
+      expect(response, isA<Success<List<ShipperRegister>, GeneralError>>());
+      final success = response as Success<List<ShipperRegister>, GeneralError>;
+      expect(success.value, hasLength(1));
+      expect(success.value.first.email, 'shipper@example.test');
     });
   });
 }

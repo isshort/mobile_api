@@ -19,8 +19,6 @@ final class HttpHeadersConst {
   static const acceptLanguage = 'Accept-Language';
 }
 
-const ACCESS_TOKEN =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZDZhY2Q0Zi0wZDdkLTRkNTEtOGViOC0wMWQ2Y2E0NTY4YTYiLCJuYW1lIjoiTmFtYXR1bGxhaFdhaGlkaSIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWVpZGVudGlmaWVyIjoiMGQ2YWNkNGYtMGQ3ZC00ZDUxLThlYjgtMDFkNmNhNDU2OGE2IiwiZW1haWwiOiIiLCJqdGkiOiI2ODRiMGEwOC0zNThmLTQwMjItOGM2Ny0wMGE0ZGMzNjkyZjIiLCJpYXQiOjE3NjkyMzkwMzUsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkNvdXJpZXJfQ3VzdG9tZXIiLCJuYmYiOjE3NjkyMzkwMzUsImV4cCI6MTc2OTI0MjYzNSwiaXNzIjoiQ2FyZ29TZXJ2aWNlQXV0aCIsImF1ZCI6IkNhcmdvU2VydmljZUFQSSJ9.p-UlpraKWHDX8O-50L7wf2PgjcTNabFl5iuOT2AcK0k";
 mixin RefreshTokenMixin {
   ApiConfig get apiConfig;
   IBaseErrorResponse get errorResponseToJson;
@@ -98,8 +96,7 @@ mixin RefreshTokenMixin {
 
     try {
       final refreshToken =
-          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ??
-          'I3RXQ/CxhycUgHGEkTEn3AMe/f1SlfrrZbvkx4cEWPb10e48niQTlpiwCsxB9nUKSCddw8EHl8648Tu/ZWCU7w==';
+          await apiConfig.appCache?.read(CoreCacheKey.refreshToken) ?? '';
       if (refreshToken.isEmpty) {
         _refreshCompleter!.complete(null);
         return null;
@@ -162,15 +159,17 @@ mixin RefreshTokenMixin {
 
   Future<Map<String, String>> defaultHeaders() async {
     final token =
-        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ??
-        ACCESS_TOKEN;
-    final lan = await apiConfig.appCache?.read(CoreCacheKey.language) ?? 'ru';
+        await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
+    final lan =
+        await apiConfig.appCache?.read(CoreCacheKey.language) ??
+        apiConfig.defaultLanguage;
     final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
 
     return {
       HttpHeaders.contentTypeHeader: HttpHeadersConst.contentTypeJson,
       HttpHeaders.acceptHeader: HttpHeadersConst.contentTypeJson,
-      HttpHeadersConst.authorization: '${HttpHeadersConst.bearer} $token',
+      if (token.isNotEmpty)
+        HttpHeadersConst.authorization: '${HttpHeadersConst.bearer} $token',
       HttpHeadersConst.marketplace: apiConfig.marketplaceValue,
       HttpHeadersConst.acceptLanguage: lan,
       if (versionCode != null && versionCode.isNotEmpty)

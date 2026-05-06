@@ -26,9 +26,10 @@ final class CustomFreshLink<T> extends FreshLink<T> {
       tokenHeader:
           tokenHeader ??
           (token) {
-            return {
-              'authorization': '${token?.tokenType} ${token?.accessToken}',
-            };
+            if (token == null || token.accessToken.isEmpty) {
+              return {};
+            }
+            return {'authorization': '${token.tokenType} ${token.accessToken}'};
           },
     );
   }

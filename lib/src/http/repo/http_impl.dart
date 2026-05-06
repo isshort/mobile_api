@@ -4,24 +4,34 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
+import 'package:http/io_client.dart';
 import 'package:http/retry.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
 
 final class IHttpImpl extends IHttp with RefreshTokenMixin {
-  IHttpImpl({required ApiConfig apiConfig}) : _apiConfig = apiConfig {
+  IHttpImpl({required ApiConfig apiConfig, http.Client? httpClient})
+    : _apiConfig = apiConfig,
+      _baseClient = httpClient {
     _init();
   }
 
   final ApiConfig _apiConfig;
+  http.Client? _baseClient;
 
   late Client _client;
 
   void _init() {
-    HttpOverrides.global = CustomHttpOverrides(bpHost: _apiConfig.apiUrl.host);
+    _baseClient ??= _apiConfig.allowBadCertificates
+        ? IOClient(
+            CustomHttpOverrides(
+              bpHost: _apiConfig.apiUrl.host,
+            ).createHttpClient(null),
+          )
+        : Client();
     final retryClient = RetryClient(
-      Client(),
+      _baseClient!,
       retries: 1,
       when: (response) => response.statusCode == HttpStatus.unauthorized,
       onRetry: _onRetry,
@@ -36,11 +46,20 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     dynamic retryCount,
   ) async {
     final token = await updateRefreshToken();
-    req.headers[HttpHeadersConst.authorization] =
-        '${HttpHeadersConst.bearer} ${token?.accessToken}';
+    if (token != null && token.accessToken.isNotEmpty) {
+      req.headers[HttpHeadersConst.authorization] =
+          '${HttpHeadersConst.bearer} ${token.accessToken}';
+    } else {
+      req.headers.remove(HttpHeadersConst.authorization);
+    }
     req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
-    req.headers[HttpHeadersConst.userAgent] =
-        '${apiConfig.userAgentValue}:${await _apiConfig.appCache?.read(CoreCacheKey.appVersion)}';
+    final versionCode = await _apiConfig.appCache?.read(
+      CoreCacheKey.appVersion,
+    );
+    if (versionCode != null && versionCode.isNotEmpty) {
+      req.headers[HttpHeadersConst.userAgent] =
+          '${apiConfig.userAgentValue}:$versionCode';
+    }
 
     return;
   }
@@ -51,7 +70,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     MapParam? params,
     Map<String, String>? headers,
   }) async {
-    final result = await http.get(Uri.parse(path), headers: headers);
+    final requestHeaders = await defaultHeaders();
+    if (headers != null) requestHeaders.addAll(headers);
+    final result = await _client.get(
+      _buildUri(path, params: params),
+      headers: requestHeaders,
+    );
     if (result.statusCode != HttpStatus.ok) {
       return SimpleResult(
         result.statusCode,
@@ -59,39 +83,6 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
       );
     }
     return SimpleResult(result.statusCode, result.body);
-  }
-
-  @override
-  Future<Result<S, E>> postIntegra<S, E extends Exception>({
-    required FromJsonFun<S> dataFromJson,
-    required ErrorFromJson<E> errorFromJson,
-    MapParam? params,
-    String? query,
-    Uri? url,
-    String? path,
-    Map<String, dynamic>? body,
-  }) async {
-    final headers = await defaultHeaders();
-    dynamic requestBody = body;
-    Map<String, String> modHeaders = Map.from(headers);
-    if (body != null) {
-      requestBody = jsonEncode(body);
-      modHeaders['Content-Type'] = 'application/json';
-    }
-    final response = await http.post(
-      url ?? _apiConfig.apiUrl.replace(path: path, queryParameters: params),
-      headers: modHeaders,
-      body: requestBody,
-    );
-    final decodeJson =
-        CustomJsonDecoder.decode(response.body) as Map<String, dynamic>?;
-    final statusCode = decodeJson != null && decodeJson.containsKey('Code')
-        ? decodeJson['Code']
-        : null;
-    if (statusCode == "1") {
-      return Success(dataFromJson(decodeJson ?? {}));
-    }
-    return Failure(errorFromJson(decodeJson ?? {}));
   }
 
   @override
@@ -152,7 +143,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     Map<String, dynamic>? params,
     RequestType? httpMethod,
   }) async {
-    final uri = _apiConfig.apiUrl.replace(path: path, queryParameters: params);
+    final uri = _buildUri(path, params: params);
     final request = await _createMultipartRequest(
       httpMethod?.value ?? RequestType.post.value,
       uri,
@@ -208,46 +199,26 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   }) async {
     final request = switch (requestType) {
       RequestType.get => _client.get(
-        _apiConfig.apiUrl.replace(
-          path: path,
-          queryParameters: headerParams,
-          query: query,
-        ),
+        _buildUri(path, params: headerParams, query: query),
         headers: await defaultHeaders(),
       ),
       RequestType.post => _client.post(
-        _apiConfig.apiUrl.replace(
-          path: path,
-          queryParameters: headerParams,
-          query: query,
-        ),
+        _buildUri(path, params: headerParams, query: query),
         headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.put => _client.put(
-        _apiConfig.apiUrl.replace(
-          path: path,
-          queryParameters: headerParams,
-          query: query,
-        ),
+        _buildUri(path, params: headerParams, query: query),
         headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.patch => _client.patch(
-        _apiConfig.apiUrl.replace(
-          path: path,
-          queryParameters: headerParams,
-          query: query,
-        ),
+        _buildUri(path, params: headerParams, query: query),
         headers: await defaultHeaders(),
         body: jsonEncode(body),
       ),
       RequestType.delete => _client.delete(
-        _apiConfig.apiUrl.replace(
-          path: path,
-          queryParameters: headerParams,
-          query: query,
-        ),
+        _buildUri(path, params: headerParams, query: query),
         headers: await defaultHeaders(),
       ),
     };
@@ -330,5 +301,14 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
   @override
   ApiConfig get apiConfig => _apiConfig;
   @override
-  http.Client get httpClient => _client;
+  http.Client get httpClient => _baseClient ?? _client;
+
+  Uri _buildUri(String path, {Map<String, dynamic>? params, String? query}) {
+    final parsed = Uri.tryParse(path);
+    final uri = parsed != null && parsed.hasScheme
+        ? parsed
+        : _apiConfig.apiUrl.replace(path: path);
+    if (query != null) return uri.replace(query: query);
+    return uri.replace(queryParameters: params);
+  }
 }

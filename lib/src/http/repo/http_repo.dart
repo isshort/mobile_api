@@ -7,17 +7,6 @@ abstract class IHttp {
     Map<String, String>? headers,
   });
 
-  Future<Result<S, E>> postIntegra<S, E extends Exception>({
-    required FromJsonFun<S> dataFromJson,
-    required ErrorFromJson<E> errorFromJson,
-    MapParam? params,
-    String? query,
-
-    Uri? url,
-    String? path,
-    Map<String, dynamic>? body,
-  });
-
   Future<Result<S, E>> baseMethod<S, E extends Exception>(
     String path, {
     required FromJsonFun<S> dataFromJson,

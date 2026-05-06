@@ -12,6 +12,7 @@ final class ApiConfig {
   final String refreshTokenPath;
   final String? loggerPath;
   final String defaultLanguage;
+  final bool allowBadCertificates;
   final ErrorResponseFactory errorResponseFactory;
 
   ApiConfig({
@@ -21,6 +22,7 @@ final class ApiConfig {
     required this.refreshTokenPath,
     this.loggerPath,
     this.defaultLanguage = 'en',
+    this.allowBadCertificates = false,
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
@@ -38,6 +40,7 @@ final class ApiConfig {
     String? refreshTokenPath,
     String? loggerPath,
     String? defaultLanguage,
+    bool? allowBadCertificates,
     ErrorResponseFactory? errorResponseFactory,
   }) {
     return ApiConfig(
@@ -50,6 +53,7 @@ final class ApiConfig {
       refreshTokenPath: refreshTokenPath ?? this.refreshTokenPath,
       loggerPath: loggerPath ?? this.loggerPath,
       defaultLanguage: defaultLanguage ?? this.defaultLanguage,
+      allowBadCertificates: allowBadCertificates ?? this.allowBadCertificates,
       errorResponseFactory: errorResponseFactory ?? this.errorResponseFactory,
     );
   }

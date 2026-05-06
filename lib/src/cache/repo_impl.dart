@@ -3,15 +3,10 @@ import 'package:mobile_api/src/cache/repo.dart';
 import 'package:mobile_api/src/utils/enum/cache.dart';
 
 final class ICacheRepoImpl implements ICacheRepo {
-  ICacheRepoImpl() {
-    _init();
-  }
+  ICacheRepoImpl({FlutterSecureStorage? secureStorage})
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  Future<void> _init() async {
-    _secureStorage = const FlutterSecureStorage();
-  }
-
-  late final FlutterSecureStorage _secureStorage;
+  final FlutterSecureStorage _secureStorage;
 
   @override
   Future<void> clear() async {
