@@ -1,20 +1,44 @@
 import '../../../mobile_api.dart';
 
+/// Creates error response instances from decoded JSON maps.
 typedef ErrorResponseFactory = IBaseErrorResponse Function();
 
+/// Shared configuration for REST and GraphQL API clients.
 final class ApiConfig {
+  /// Base API URL used when request paths are relative.
   final Uri apiUrl;
+
+  /// Marketplace header value sent with each configured request.
   final String marketplaceValue;
+
+  /// User-Agent prefix sent with each configured request.
   final String userAgentValue;
+
+  /// Optional network checker used before executing API calls.
   final CheckNetwork? checkNetwork;
+
+  /// Optional secure cache used for access tokens, refresh tokens, and headers.
   final ICacheRepo? appCache;
+
+  /// GraphQL pagination key names used by list helpers.
   final PageFieldKeys pageFieldKeys;
+
+  /// Relative endpoint used to refresh access tokens.
   final String refreshTokenPath;
+
+  /// Optional relative endpoint used for error logging.
   final String? loggerPath;
+
+  /// Fallback language for the `Accept-Language` header.
   final String defaultLanguage;
+
+  /// Allows bad TLS certificates for the configured host when explicitly true.
   final bool allowBadCertificates;
+
+  /// Factory used to create package-level error responses.
   final ErrorResponseFactory errorResponseFactory;
 
+  /// Builds API client configuration.
   ApiConfig({
     required this.apiUrl,
     required this.marketplaceValue,
@@ -29,7 +53,7 @@ final class ApiConfig {
     this.errorResponseFactory = _defaultErrorFactory,
   });
 
-  // copywith
+  /// Returns a copy with selected configuration values replaced.
   ApiConfig copyWith({
     Uri? apiUrl,
     String? marketplaceValue,
@@ -64,9 +88,16 @@ final class ApiConfig {
 
 /// Configuration for paginated GraphQL container keys.
 class PageFieldKeys {
+  /// Default GraphQL list item key.
   final String itemsKey;
+
+  /// Default GraphQL pagination info key.
   final String pageInfoKey;
+
+  /// Default GraphQL next-page flag key.
   final String hasNextPageKey;
+
+  /// Creates key names for paginated GraphQL response containers.
   const PageFieldKeys({
     this.itemsKey = 'items',
     this.pageInfoKey = 'pageInfo',

@@ -1,28 +1,26 @@
 name: mobile_api
-description: "mobile api package for moam digital system"
-version: 0.0.4+11
-homepage: https://github.com/isshort/mobile_api
-repository: https://github.com/isshort/mobile_api
+description: Typed REST and GraphQL API helpers for Flutter apps, with token refresh, secure cache storage, multipart uploads, and network checks.
+version: 0.0.5+12
+homepage: https://pub.dev/packages/mobile_api
 
 environment:
   sdk: ^3.9.0
   flutter: ">=1.17.0"
 
 dependencies:
-  connectivity_plus: ^6.1.5
+  connectivity_plus: ^7.1.1
   flutter:
     sdk: flutter
   flutter_secure_storage: ^10.0.0
-  fresh_graphql: ^0.6.1
+  fresh_graphql: ^0.8.0
   graphql: ^5.2.3
-  http: ^1.5.0
-  http_parser: ^4.1.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
-  mocktail: ^1.0.4
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.5
 
  
 

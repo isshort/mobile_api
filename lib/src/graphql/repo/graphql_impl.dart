@@ -7,7 +7,9 @@ import 'package:http/io_client.dart';
 
 import '../../../mobile_api.dart';
 
+/// Default GraphQL client implementation with token refresh support.
 final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
+  /// Creates a GraphQL client from [apiConfig].
   IGraphQlImpl({required ApiConfig apiConfig, http.Client? httpClient})
     : _apiConfig = apiConfig,
       _rawClient = httpClient ?? _createHttpClient(apiConfig) {

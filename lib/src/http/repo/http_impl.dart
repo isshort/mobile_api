@@ -6,11 +6,12 @@ import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 import 'package:http/io_client.dart';
 import 'package:http/retry.dart';
-import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../../mobile_api.dart';
 
+/// Default REST client implementation with refresh retry support.
 final class IHttpImpl extends IHttp with RefreshTokenMixin {
+  /// Creates a REST client from [apiConfig].
   IHttpImpl({required ApiConfig apiConfig, http.Client? httpClient})
     : _apiConfig = apiConfig,
       _baseClient = httpClient {

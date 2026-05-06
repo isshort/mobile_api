@@ -1,11 +1,7 @@
 import 'package:graphql/client.dart';
 
 class GraphQlErrorModel implements Exception {
-  GraphQlErrorModel({
-    this.error,
-    this.status,
-    this.reasonPhrase,
-  });
+  GraphQlErrorModel({this.error, this.status, this.reasonPhrase});
   factory GraphQlErrorModel.fromJson(Map<String, dynamic> json) {
     return GraphQlErrorModel(
       error: _graphQlErrorFromJson(json['errors']),
@@ -59,8 +55,9 @@ final class GraphqlErrorType extends GraphQLError {
   factory GraphqlErrorType.fromJson(Map<String, dynamic> json) =>
       GraphqlErrorType(
         message: json['message'] as String,
-        path:
-            (json['path'] as List<dynamic>?)?.map((e) => e as String).toList(),
+        path: (json['path'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList(),
         extensions: json['extensions'] as Map<String, dynamic>?,
       );
 }

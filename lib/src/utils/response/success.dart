@@ -1,9 +1,5 @@
 final class SuccessResponse {
-  SuccessResponse({
-    this.data,
-    this.error,
-    this.status,
-  });
+  SuccessResponse({this.data, this.error, this.status});
   factory SuccessResponse.fromJson(Map<String, dynamic> json) =>
       SuccessResponse(
         data: json['data'] as Map<String, dynamic>?,
