@@ -1,3 +1,7 @@
+## 0.0.6+13
+
+- Added `InMemoryCacheRepo`, a Map-backed `ICacheRepo` for injecting tokens in tests without `FlutterSecureStorage`.
+
 ## 0.0.5+12
 
 - Improved pub.dev scoring metadata and API documentation.
