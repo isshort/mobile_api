@@ -84,14 +84,7 @@ void main() {
           reasonPhrase: 'Bad Request',
         );
       });
-      // ignore: deprecated_member_use_from_same_package
-      final legacyConfig = ApiConfig(
-        apiUrl: Uri(scheme: 'https', host: 'api.example.test'),
-        marketplaceValue: 'ml',
-        userAgentValue: 'mlApp',
-        refreshTokenPath: '/api/accounts/refresh',
-      );
-      final api = IHttpImpl(apiConfig: legacyConfig, httpClient: client);
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
 
       final response = await api.baseMethod<AuthResponse, GeneralError>(
         '/api/shipper/login',
@@ -185,7 +178,7 @@ void main() {
       expect(response, isA<Success<AuthResponse, GeneralError>>());
     });
 
-    test('maps legacy config values into headers', () async {
+    test('sends configured standard headers', () async {
       final client = MockClient((request) async {
         expect(request.headers[HttpHeadersConst.marketplace], 'ml');
         expect(request.headers[HttpHeadersConst.userAgent], 'mlApp');
