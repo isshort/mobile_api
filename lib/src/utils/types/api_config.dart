@@ -8,11 +8,16 @@ final class ApiConfig {
   /// Base API URL used when request paths are relative.
   final Uri apiUrl;
 
+  /// Static headers sent with each configured REST and GraphQL request.
+  final Map<String, String> headers;
+
   /// Marketplace header value sent with each configured request.
-  final String marketplaceValue;
+  @Deprecated('Use headers[HttpHeadersConst.marketplace] instead.')
+  String get marketplaceValue => headers[HttpHeadersConst.marketplace] ?? '';
 
   /// User-Agent prefix sent with each configured request.
-  final String userAgentValue;
+  @Deprecated('Use headers[HttpHeadersConst.userAgent] instead.')
+  String get userAgentValue => headers[HttpHeadersConst.userAgent] ?? '';
 
   /// Optional network checker used before executing API calls.
   final CheckNetwork? checkNetwork;
@@ -30,7 +35,13 @@ final class ApiConfig {
   final String? loggerPath;
 
   /// Fallback language for the `Accept-Language` header.
-  final String defaultLanguage;
+  @Deprecated('Use headers[HttpHeadersConst.acceptLanguage] instead.')
+  String get defaultLanguage =>
+      headers[HttpHeadersConst.acceptLanguage] ?? 'en';
+
+  /// Additional headers sent with each configured REST and GraphQL request.
+  @Deprecated('Use headers instead.')
+  Map<String, String> get customHeaders => headers;
 
   /// Allows bad TLS certificates for the configured host when explicitly true.
   final bool allowBadCertificates;
@@ -41,17 +52,26 @@ final class ApiConfig {
   /// Builds API client configuration.
   ApiConfig({
     required this.apiUrl,
-    required this.marketplaceValue,
-    required this.userAgentValue,
+    String? marketplaceValue,
+    String? userAgentValue,
     required this.refreshTokenPath,
     this.loggerPath,
-    this.defaultLanguage = 'en',
+    String? defaultLanguage,
+    Map<String, String> headers = const {},
+    @Deprecated('Use headers instead.')
+    Map<String, String> customHeaders = const {},
     this.allowBadCertificates = false,
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
     this.errorResponseFactory = _defaultErrorFactory,
-  });
+  }) : headers = _buildHeaders(
+         marketplaceValue: marketplaceValue,
+         userAgentValue: userAgentValue,
+         defaultLanguage: defaultLanguage,
+         customHeaders: customHeaders,
+         headers: headers,
+       );
 
   /// Returns a copy with selected configuration values replaced.
   ApiConfig copyWith({
@@ -64,19 +84,32 @@ final class ApiConfig {
     String? refreshTokenPath,
     String? loggerPath,
     String? defaultLanguage,
+    Map<String, String>? headers,
+    @Deprecated('Use headers instead.') Map<String, String>? customHeaders,
     bool? allowBadCertificates,
     ErrorResponseFactory? errorResponseFactory,
   }) {
+    final updatedHeaders = Map<String, String>.of(
+      headers ?? customHeaders ?? this.headers,
+    );
+    if (marketplaceValue != null) {
+      updatedHeaders[HttpHeadersConst.marketplace] = marketplaceValue;
+    }
+    if (userAgentValue != null) {
+      updatedHeaders[HttpHeadersConst.userAgent] = userAgentValue;
+    }
+    if (defaultLanguage != null) {
+      updatedHeaders[HttpHeadersConst.acceptLanguage] = defaultLanguage;
+    }
+
     return ApiConfig(
       apiUrl: apiUrl ?? this.apiUrl,
-      marketplaceValue: marketplaceValue ?? this.marketplaceValue,
-      userAgentValue: userAgentValue ?? this.userAgentValue,
       checkNetwork: checkNetwork ?? this.checkNetwork,
       appCache: appCache ?? this.appCache,
       pageFieldKeys: pageFieldKeys ?? this.pageFieldKeys,
       refreshTokenPath: refreshTokenPath ?? this.refreshTokenPath,
       loggerPath: loggerPath ?? this.loggerPath,
-      defaultLanguage: defaultLanguage ?? this.defaultLanguage,
+      headers: updatedHeaders,
       allowBadCertificates: allowBadCertificates ?? this.allowBadCertificates,
       errorResponseFactory: errorResponseFactory ?? this.errorResponseFactory,
     );
@@ -84,6 +117,31 @@ final class ApiConfig {
 
   static IBaseErrorResponse _defaultErrorFactory() =>
       const DefaultErrorResponse();
+
+  static Map<String, String> _buildHeaders({
+    required Map<String, String> customHeaders,
+    required Map<String, String> headers,
+    String? marketplaceValue,
+    String? userAgentValue,
+    String? defaultLanguage,
+  }) {
+    final acceptLanguage =
+        defaultLanguage ??
+        headers[HttpHeadersConst.acceptLanguage] ??
+        customHeaders[HttpHeadersConst.acceptLanguage] ??
+        'en';
+
+    return {
+      if (marketplaceValue != null && marketplaceValue.isNotEmpty)
+        HttpHeadersConst.marketplace: marketplaceValue,
+      if (userAgentValue != null && userAgentValue.isNotEmpty)
+        HttpHeadersConst.userAgent: userAgentValue,
+      if (acceptLanguage.isNotEmpty)
+        HttpHeadersConst.acceptLanguage: acceptLanguage,
+      ...customHeaders,
+      ...headers,
+    };
+  }
 }
 
 /// Configuration for paginated GraphQL container keys.

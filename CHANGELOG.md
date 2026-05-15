@@ -1,3 +1,8 @@
+## 0.0.7+14
+
+- Added unified `ApiConfig.headers` support for REST and GraphQL clients.
+- Deprecated separate marketplace, user-agent, default-language, and custom-header configuration fields in favor of `headers`.
+
 ## 0.0.6+13
 
 - Added `InMemoryCacheRepo`, a Map-backed `ICacheRepo` for injecting tokens in tests without `FlutterSecureStorage`.

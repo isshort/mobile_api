@@ -9,18 +9,35 @@ import 'model/auth_response.dart';
 import 'model/general_error.dart';
 import 'model/shipper_register.dart';
 
-ApiConfig _config({String path = '', ICacheRepo? appCache}) {
+ApiConfig _config({
+  String path = '',
+  ICacheRepo? appCache,
+  Map<String, String> headers = const {},
+}) {
   return ApiConfig(
     apiUrl: Uri(scheme: 'https', host: 'api.example.test', path: path),
-    marketplaceValue: 'ml',
-    userAgentValue: 'mlApp',
     refreshTokenPath: '/api/accounts/refresh',
     appCache: appCache,
+    headers: {
+      HttpHeadersConst.marketplace: 'ml',
+      HttpHeadersConst.userAgent: 'mlApp',
+      HttpHeadersConst.acceptLanguage: 'en',
+      ...headers,
+    },
   );
 }
 
 InMemoryCacheRepo _tokenCache(String token) =>
     InMemoryCacheRepo({CoreCacheKey.accessToken: token});
+
+const _hibetaHeaders = {
+  'referer': 'https://teststore.hibeta.kz/',
+  'x-hibeta-country-locked': 'true',
+  'x-hibeta-language': 'tr',
+  'x-hibeta-storefront-host': 'teststore.hibeta.kz',
+  'x-hibeta-tenant-country': 'KZ',
+  'x-hibeta-tenant-mode': 'single-country',
+};
 
 void main() {
   group('IHttpImpl', () {
@@ -67,7 +84,14 @@ void main() {
           reasonPhrase: 'Bad Request',
         );
       });
-      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+      // ignore: deprecated_member_use_from_same_package
+      final legacyConfig = ApiConfig(
+        apiUrl: Uri(scheme: 'https', host: 'api.example.test'),
+        marketplaceValue: 'ml',
+        userAgentValue: 'mlApp',
+        refreshTokenPath: '/api/accounts/refresh',
+      );
+      final api = IHttpImpl(apiConfig: legacyConfig, httpClient: client);
 
       final response = await api.baseMethod<AuthResponse, GeneralError>(
         '/api/shipper/login',
@@ -97,26 +121,86 @@ void main() {
       expect(response.body, 'ok');
     });
 
-    test('sends Authorization header when token is supplied via InMemoryCacheRepo', () async {
-      final client = MockClient((request) async {
-        expect(
-          request.headers[HttpHeadersConst.authorization],
-          '${HttpHeadersConst.bearer} test-token',
+    test(
+      'sends Authorization header when token is supplied via InMemoryCacheRepo',
+      () async {
+        final client = MockClient((request) async {
+          expect(
+            request.headers[HttpHeadersConst.authorization],
+            '${HttpHeadersConst.bearer} test-token',
+          );
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'new-token',
+              'userId': 'u1',
+              'email': 'a@b.com',
+              'roles': [],
+            }),
+            200,
+          );
+        });
+        final api = IHttpImpl(
+          apiConfig: _config(appCache: _tokenCache('test-token')),
+          httpClient: client,
         );
+
+        final response = await api.baseMethod<AuthResponse, GeneralError>(
+          '/api/me',
+          dataFromJson: AuthResponse.fromJson,
+          errorFromJson: GeneralError.fromJson,
+          requestType: RequestType.get,
+        );
+
+        expect(response, isA<Success<AuthResponse, GeneralError>>());
+      },
+    );
+
+    test('sends configured custom headers', () async {
+      final client = MockClient((request) async {
+        for (final entry in _hibetaHeaders.entries) {
+          expect(request.headers[entry.key], entry.value);
+        }
         return http.Response(
           jsonEncode({
-            'accessToken': 'new-token',
-            'userId': 'u1',
-            'email': 'a@b.com',
-            'roles': [],
+            'accessToken': 'access-token',
+            'userId': 'user-id',
+            'email': 'shipper@example.test',
+            'roles': ['Shipper'],
           }),
           200,
         );
       });
       final api = IHttpImpl(
-        apiConfig: _config(appCache: _tokenCache('test-token')),
+        apiConfig: _config(headers: _hibetaHeaders),
         httpClient: client,
       );
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/me',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.get,
+      );
+
+      expect(response, isA<Success<AuthResponse, GeneralError>>());
+    });
+
+    test('maps legacy config values into headers', () async {
+      final client = MockClient((request) async {
+        expect(request.headers[HttpHeadersConst.marketplace], 'ml');
+        expect(request.headers[HttpHeadersConst.userAgent], 'mlApp');
+        expect(request.headers[HttpHeadersConst.acceptLanguage], 'en');
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'access-token',
+            'userId': 'user-id',
+            'email': 'shipper@example.test',
+            'roles': ['Shipper'],
+          }),
+          200,
+        );
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
 
       final response = await api.baseMethod<AuthResponse, GeneralError>(
         '/api/me',
@@ -182,12 +266,52 @@ query getShippers {
       expect(success.value.first.email, 'shipper@example.test');
     });
 
-    test('sends Authorization header when token is supplied via InMemoryCacheRepo', () async {
-      final client = MockClient((request) async {
-        expect(
-          request.headers[HttpHeadersConst.authorization],
-          '${HttpHeadersConst.bearer} gql-token',
+    test(
+      'sends Authorization header when token is supplied via InMemoryCacheRepo',
+      () async {
+        final client = MockClient((request) async {
+          expect(
+            request.headers[HttpHeadersConst.authorization],
+            '${HttpHeadersConst.bearer} gql-token',
+          );
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'shippers': {
+                  'pageInfo': {'hasNextPage': false},
+                  'items': [],
+                },
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+        final api = IGraphQlImpl(
+          apiConfig: _config(
+            path: '/graphql',
+            appCache: _tokenCache('gql-token'),
+          ),
+          httpClient: client,
         );
+
+        final response = await api.queryList<ShipperRegister, GeneralError>(
+          field: 'shippers',
+          dataFromJson: ShipperRegister.fromJson,
+          errorFromJson: GeneralError.fromJson,
+          path:
+              'query { shippers { pageInfo { hasNextPage } items { email } } }',
+        );
+
+        expect(response, isA<Success<List<ShipperRegister>, GeneralError>>());
+      },
+    );
+
+    test('sends configured custom headers', () async {
+      final client = MockClient((request) async {
+        for (final entry in _hibetaHeaders.entries) {
+          expect(request.headers[entry.key], entry.value);
+        }
         return http.Response(
           jsonEncode({
             'data': {
@@ -202,7 +326,7 @@ query getShippers {
         );
       });
       final api = IGraphQlImpl(
-        apiConfig: _config(path: '/graphql', appCache: _tokenCache('gql-token')),
+        apiConfig: _config(path: '/graphql', headers: _hibetaHeaders),
         httpClient: client,
       );
 

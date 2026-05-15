@@ -33,12 +33,21 @@ final cache = ICacheRepoImpl();
 
 final apiConfig = ApiConfig(
   apiUrl: Uri.parse('https://api.example.com'),
-  marketplaceValue: 'ml',
-  userAgentValue: 'mlApp',
   refreshTokenPath: '/api/accounts/refresh',
   loggerPath: '/logger',
   appCache: cache,
   checkNetwork: CheckNetwork(),
+  headers: const {
+    HttpHeadersConst.marketplace: 'ml',
+    HttpHeadersConst.userAgent: 'mlApp',
+    HttpHeadersConst.acceptLanguage: 'tr',
+    'referer': 'https://teststore.hibeta.kz/',
+    'x-hibeta-country-locked': 'true',
+    'x-hibeta-language': 'tr',
+    'x-hibeta-storefront-host': 'teststore.hibeta.kz',
+    'x-hibeta-tenant-country': 'KZ',
+    'x-hibeta-tenant-mode': 'single-country',
+  },
 );
 ```
 

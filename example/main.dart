@@ -23,11 +23,14 @@ Future<void> main() async {
 
   final config = ApiConfig(
     apiUrl: Uri.parse('https://api.example.com'),
-    marketplaceValue: 'ml',
-    userAgentValue: 'mlApp',
     refreshTokenPath: '/api/accounts/refresh',
     appCache: cache,
     checkNetwork: CheckNetwork(),
+    headers: const {
+      HttpHeadersConst.marketplace: 'ml',
+      HttpHeadersConst.userAgent: 'mlApp',
+      HttpHeadersConst.acceptLanguage: 'en',
+    },
   );
 
   final rest = IHttpImpl(apiConfig: config);

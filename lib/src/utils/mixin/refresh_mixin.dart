@@ -158,22 +158,25 @@ mixin RefreshTokenMixin {
   }
 
   Future<Map<String, String>> defaultHeaders() async {
+    final configuredHeaders = apiConfig.headers;
     final token =
         await apiConfig.appCache?.read(CoreCacheKey.accessToken) ?? '';
     final lan =
         await apiConfig.appCache?.read(CoreCacheKey.language) ??
-        apiConfig.defaultLanguage;
+        configuredHeaders[HttpHeadersConst.acceptLanguage] ??
+        'en';
     final versionCode = await apiConfig.appCache?.read(CoreCacheKey.appVersion);
+    final userAgent = configuredHeaders[HttpHeadersConst.userAgent] ?? '';
 
     return {
       HttpHeaders.contentTypeHeader: HttpHeadersConst.contentTypeJson,
       HttpHeaders.acceptHeader: HttpHeadersConst.contentTypeJson,
+      ...configuredHeaders,
       if (token.isNotEmpty)
         HttpHeadersConst.authorization: '${HttpHeadersConst.bearer} $token',
-      HttpHeadersConst.marketplace: apiConfig.marketplaceValue,
       HttpHeadersConst.acceptLanguage: lan,
-      if (versionCode != null && versionCode.isNotEmpty)
-        HttpHeadersConst.userAgent: '${apiConfig.userAgentValue}:$versionCode',
+      if (userAgent.isNotEmpty && versionCode != null && versionCode.isNotEmpty)
+        HttpHeadersConst.userAgent: '$userAgent:$versionCode',
     };
   }
 

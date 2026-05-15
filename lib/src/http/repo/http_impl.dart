@@ -46,6 +46,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     BaseResponse? res,
     dynamic retryCount,
   ) async {
+    req.headers.addAll(_apiConfig.headers);
     final token = await updateRefreshToken();
     if (token != null && token.accessToken.isNotEmpty) {
       req.headers[HttpHeadersConst.authorization] =
@@ -53,13 +54,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     } else {
       req.headers.remove(HttpHeadersConst.authorization);
     }
-    req.headers[HttpHeadersConst.marketplace] = _apiConfig.marketplaceValue;
     final versionCode = await _apiConfig.appCache?.read(
       CoreCacheKey.appVersion,
     );
-    if (versionCode != null && versionCode.isNotEmpty) {
-      req.headers[HttpHeadersConst.userAgent] =
-          '${apiConfig.userAgentValue}:$versionCode';
+    final userAgent = _apiConfig.headers[HttpHeadersConst.userAgent] ?? '';
+    if (userAgent.isNotEmpty && versionCode != null && versionCode.isNotEmpty) {
+      req.headers[HttpHeadersConst.userAgent] = '$userAgent:$versionCode';
     }
 
     return;
