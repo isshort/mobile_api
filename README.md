@@ -17,7 +17,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  mobile_api: ^0.0.5+12
+  mobile_api: ^0.0.8+15
 ```
 
 Import it:
@@ -80,6 +80,19 @@ switch (result) {
   case Failure(exception: final error):
     // handle error
 }
+```
+
+For endpoints that return `204 No Content` or another successful empty body,
+provide an `emptySuccessBuilder` so the typed result can still be a success:
+
+```dart
+final result = await httpApi.baseMethod<BooleanResponse, DefaultErrorResponse>(
+  '/api/users/me',
+  requestType: RequestType.delete,
+  dataFromJson: BooleanResponse.fromJsonPhone,
+  errorFromJson: DefaultErrorResponse.fromJson,
+  emptySuccessBuilder: (_) => BooleanResponse(isSuccess: true),
+);
 ```
 
 ## GraphQL usage

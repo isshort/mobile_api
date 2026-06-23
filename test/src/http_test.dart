@@ -70,7 +70,95 @@ void main() {
 
       expect(response, isA<Success<AuthResponse, GeneralError>>());
       final success = response as Success<AuthResponse, GeneralError>;
+      expect(success.statusCode, 200);
       expect(success.value.accessToken, 'access-token');
+    });
+
+    test('treats 202 JSON responses as success', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'accepted-token',
+            'userId': 'user-id',
+            'email': 'shipper@example.test',
+            'roles': ['Shipper'],
+          }),
+          202,
+        );
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/jobs',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.post,
+      );
+
+      expect(response, isA<Success<AuthResponse, GeneralError>>());
+      final success = response as Success<AuthResponse, GeneralError>;
+      expect(success.statusCode, 202);
+      expect(success.value.accessToken, 'accepted-token');
+    });
+
+    test('maps 204 empty responses with emptySuccessBuilder', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'DELETE');
+        return http.Response('', 204);
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/session',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.delete,
+        emptySuccessBuilder: (statusCode) =>
+            const AuthResponse(accessToken: 'deleted'),
+      );
+
+      expect(response, isA<Success<AuthResponse, GeneralError>>());
+      final success = response as Success<AuthResponse, GeneralError>;
+      expect(success.statusCode, 204);
+      expect(success.value.accessToken, 'deleted');
+    });
+
+    test('returns clear failure for 204 without emptySuccessBuilder', () async {
+      final client = MockClient((request) async {
+        return http.Response('', 204);
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/session',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.delete,
+      );
+
+      expect(response, isA<Failure<AuthResponse, GeneralError>>());
+      final failure = response as Failure<AuthResponse, GeneralError>;
+      expect(failure.exception.status, 204);
+      expect(failure.exception.reasonPhrase, contains('emptySuccessBuilder'));
+    });
+
+    test('preserves status for empty non-2xx failures', () async {
+      final client = MockClient((request) async {
+        return http.Response('', 404, reasonPhrase: 'Not Found');
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.baseMethod<AuthResponse, GeneralError>(
+        '/api/missing',
+        dataFromJson: AuthResponse.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        requestType: RequestType.get,
+      );
+
+      expect(response, isA<Failure<AuthResponse, GeneralError>>());
+      final failure = response as Failure<AuthResponse, GeneralError>;
+      expect(failure.exception.status, 404);
+      expect(failure.exception.reasonPhrase, 'Not Found');
     });
 
     test('decodes error JSON responses', () async {
@@ -112,6 +200,18 @@ void main() {
 
       expect(response.statusCode, 200);
       expect(response.body, 'ok');
+    });
+
+    test('raw GET treats 204 as a successful empty response', () async {
+      final client = MockClient((request) async {
+        return http.Response('', 204);
+      });
+      final api = IHttpImpl(apiConfig: _config(), httpClient: client);
+
+      final response = await api.get('/api/session');
+
+      expect(response.statusCode, 204);
+      expect(response.body, isEmpty);
     });
 
     test(

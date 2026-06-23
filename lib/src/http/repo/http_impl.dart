@@ -77,7 +77,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
       _buildUri(path, params: params),
       headers: requestHeaders,
     );
-    if (result.statusCode != HttpStatus.ok) {
+    if (!_isSuccessStatus(result.statusCode)) {
       return SimpleResult(
         result.statusCode,
         result.reasonPhrase ?? result.body,
@@ -92,6 +92,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     required FromJsonFun<S> dataFromJson,
     required ErrorFromJson<E> errorFromJson,
     required RequestType requestType,
+    EmptySuccessBuilder<S>? emptySuccessBuilder,
     MapParam? params,
     String? query,
     Map<String, dynamic>? body,
@@ -104,7 +105,12 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         query: query,
         body: body,
       );
-      return customHttpResponse<S, E>(dataFromJson, errorFromJson, response);
+      return customHttpResponse<S, E>(
+        dataFromJson,
+        errorFromJson,
+        response,
+        emptySuccessBuilder: emptySuccessBuilder,
+      );
     }, errorFromJson);
   }
 
@@ -114,6 +120,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     required FromJsonFun<S> dataFromJson,
     required ErrorFromJson<E> errorFromJson,
     required RequestType requestType,
+    EmptySuccessBuilder<S>? emptySuccessBuilder,
     MapParam? params,
     String? query,
     Map<String, dynamic>? body,
@@ -130,6 +137,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
         dataFromJson: dataFromJson,
         exception: errorFromJson,
         response: response,
+        emptySuccessBuilder: emptySuccessBuilder,
       );
     }, errorFromJson);
   }
@@ -140,6 +148,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     required FromJsonFun<S> successFromJson,
     required ErrorFromJson<E> errorFromJson,
     required Map<String, String> body,
+    EmptySuccessBuilder<S>? emptySuccessBuilder,
     Map<String, String>? files,
     Map<String, dynamic>? params,
     RequestType? httpMethod,
@@ -167,15 +176,21 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     final response = await request.send();
 
     final responseBody = await http.Response.fromStream(response);
-    if (responseBody.statusCode == 200 || responseBody.statusCode == 201) {
+    if (_isSuccessStatus(responseBody.statusCode)) {
+      if (responseBody.body.isEmpty) {
+        return _emptySuccessResponse(
+          responseBody,
+          errorFromJson,
+          emptySuccessBuilder,
+        );
+      }
       return Success(
         successFromJson(CustomJsonDecoder.toJsonData(responseBody.body)),
+        statusCode: responseBody.statusCode,
       );
     }
     await addLogger(responseBody.reasonPhrase);
-    return Failure(
-      errorFromJson(CustomJsonDecoder.toJsonData(responseBody.body)),
-    );
+    return _failureResponse(responseBody, errorFromJson);
   }
 
   Future<MultipartRequest> _createMultipartRequest(
@@ -232,67 +247,85 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
     required ErrorFromJson<E> exception,
     required http.Response response,
     String type = 'data',
+    EmptySuccessBuilder<T>? emptySuccessBuilder,
   }) {
-    final result = switch (response.statusCode) {
-      HttpStatus.ok ||
-      HttpStatus.created when response.body.isNotEmpty => Success<T, E>(
+    if (_isSuccessStatus(response.statusCode)) {
+      if (response.body.isEmpty) {
+        return _emptySuccessResponse(response, exception, emptySuccessBuilder);
+      }
+      return Success<T, E>(
         dataFromJson(
           CustomJsonDecoder.toJsonDataType(body: response.body, data: type)!,
         ),
-      ),
-      _ => () {
-        addLogger(response.errorFullMessageHttp);
-        if (response.body.isNotEmpty) {
-          return Failure<T, E>(
-            exception(CustomJsonDecoder.toJsonData(response.body)),
-          );
-        }
-        return Failure<T, E>(
-          exception(
-            errorResponseToJson
-                .copyWith(
-                  status: response.statusCode,
-                  reasonPhrase: response.reasonPhrase,
-                  errors: response.request,
-                )
-                .toJson(),
-          ),
-        );
-      }(),
-    };
-    return result;
+        statusCode: response.statusCode,
+      );
+    }
+    addLogger(response.errorFullMessageHttp);
+    return _failureResponse(response, exception);
   }
 
   Result<T, E> customHttpResponse<T, E extends Exception>(
     FromJsonFun<T> dataFromJson,
     ErrorFromJson<E> exception,
-    http.Response response,
-  ) {
-    final statusResult = switch (response.statusCode) {
-      HttpStatus.ok || HttpStatus.created => Success<T, E>(
+    http.Response response, {
+    EmptySuccessBuilder<T>? emptySuccessBuilder,
+  }) {
+    if (_isSuccessStatus(response.statusCode)) {
+      if (response.body.isEmpty) {
+        return _emptySuccessResponse(response, exception, emptySuccessBuilder);
+      }
+      return Success<T, E>(
         dataFromJson(CustomJsonDecoder.toJsonData(response.body)),
+        statusCode: response.statusCode,
+      );
+    }
+    addLogger(response.errorFullMessageHttp);
+    return _failureResponse(response, exception);
+  }
+
+  bool _isSuccessStatus(int statusCode) =>
+      statusCode >= 200 && statusCode < 300;
+
+  Result<T, E> _emptySuccessResponse<T, E extends Exception>(
+    http.Response response,
+    ErrorFromJson<E> exception,
+    EmptySuccessBuilder<T>? emptySuccessBuilder,
+  ) {
+    if (emptySuccessBuilder != null) {
+      return Success<T, E>(
+        emptySuccessBuilder(response.statusCode),
+        statusCode: response.statusCode,
+      );
+    }
+    return _failureResponse(
+      response,
+      exception,
+      reasonPhrase:
+          'Successful response has no body. Provide emptySuccessBuilder to map status ${response.statusCode}.',
+    );
+  }
+
+  Failure<T, E> _failureResponse<T, E extends Exception>(
+    http.Response response,
+    ErrorFromJson<E> exception, {
+    String? reasonPhrase,
+  }) {
+    if (response.body.isNotEmpty) {
+      return Failure<T, E>(
+        exception(CustomJsonDecoder.toJsonData(response.body)),
+      );
+    }
+    return Failure<T, E>(
+      exception(
+        errorResponseToJson
+            .copyWith(
+              status: response.statusCode,
+              reasonPhrase: reasonPhrase ?? response.reasonPhrase,
+              errors: response.request,
+            )
+            .toJson(),
       ),
-      _ => () {
-        addLogger(response.errorFullMessageHttp);
-        if (response.body.isNotEmpty) {
-          return Failure<T, E>(
-            exception(CustomJsonDecoder.toJsonData(response.body)),
-          );
-        }
-        return Failure<T, E>(
-          exception(
-            errorResponseToJson
-                .copyWith(
-                  status: response.statusCode,
-                  reasonPhrase: response.reasonPhrase,
-                  errors: response.request,
-                )
-                .toJson(),
-          ),
-        );
-      }(),
-    };
-    return statusResult;
+    );
   }
 
   @override

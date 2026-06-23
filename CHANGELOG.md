@@ -1,3 +1,9 @@
+## 0.0.8+15
+
+- Treated all REST `2xx` HTTP status codes as successful responses.
+- Added `emptySuccessBuilder` for mapping `204` and other empty success responses.
+- Exposed REST success status codes through `Success.statusCode`.
+
 ## 0.0.7+14
 
 - Added unified `ApiConfig.headers` support for REST and GraphQL clients.
