@@ -10,15 +10,16 @@ import 'package:http/retry.dart';
 import '../../../mobile_api.dart';
 
 /// Default REST client implementation with refresh retry support.
-final class IHttpImpl extends IHttp with RefreshTokenMixin {
+final class IHttpImpl<TokenType extends IBOAuth2Token> extends IHttp
+    with RefreshTokenMixin<TokenType> {
   /// Creates a REST client from [apiConfig].
-  IHttpImpl({required ApiConfig apiConfig, http.Client? httpClient})
+  IHttpImpl({required ApiConfig<TokenType> apiConfig, http.Client? httpClient})
     : _apiConfig = apiConfig,
       _baseClient = httpClient {
     _init();
   }
 
-  final ApiConfig _apiConfig;
+  final ApiConfig<TokenType> _apiConfig;
   http.Client? _baseClient;
 
   late Client _client;
@@ -333,7 +334,7 @@ final class IHttpImpl extends IHttp with RefreshTokenMixin {
       _apiConfig.errorResponseFactory();
 
   @override
-  ApiConfig get apiConfig => _apiConfig;
+  ApiConfig<TokenType> get apiConfig => _apiConfig;
   @override
   http.Client get httpClient => _baseClient ?? _client;
 

@@ -13,13 +13,13 @@ final class CustomFreshLink<T> extends FreshLink<T> {
   });
 
   /// Here we used our own custom TokenStorage [IBOAuth2Token]
-  static CustomFreshLink<IBOAuth2Token> oAuth2({
-    required TokenStorage<IBOAuth2Token> tokenStorage,
-    required RefreshToken<IBOAuth2Token?> refreshToken,
+  static CustomFreshLink<T> oAuth2<T extends IBOAuth2Token>({
+    required TokenStorage<T> tokenStorage,
+    required RefreshToken<T?> refreshToken,
     required ShouldRefresh shouldRefresh,
-    TokenHeaderBuilder<IBOAuth2Token?>? tokenHeader,
+    TokenHeaderBuilder<T?>? tokenHeader,
   }) {
-    return CustomFreshLink<IBOAuth2Token>(
+    return CustomFreshLink<T>(
       refreshToken: refreshToken,
       tokenStorage: tokenStorage,
       shouldRefresh: shouldRefresh,

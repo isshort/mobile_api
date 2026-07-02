@@ -4,7 +4,7 @@ import '../../../mobile_api.dart';
 typedef ErrorResponseFactory = IBaseErrorResponse Function();
 
 /// Shared configuration for REST and GraphQL API clients.
-final class ApiConfig {
+final class ApiConfig<TokenType extends IBOAuth2Token> {
   /// Base API URL used when request paths are relative.
   final Uri apiUrl;
 
@@ -23,6 +23,12 @@ final class ApiConfig {
   /// Relative endpoint used to refresh access tokens.
   final String refreshTokenPath;
 
+  /// Builds the refresh-token request body.
+  final RefreshBodyBuilder refreshBodyBuilder;
+
+  /// Parses a refresh-token response payload into the configured token type.
+  final RefreshTokenFromJson<TokenType> refreshTokenFromJson;
+
   /// Optional relative endpoint used for error logging.
   final String? loggerPath;
 
@@ -37,32 +43,41 @@ final class ApiConfig {
     required this.apiUrl,
     required this.refreshTokenPath,
     this.loggerPath,
+    RefreshBodyBuilder? refreshBodyBuilder,
+    RefreshTokenFromJson<TokenType>? refreshTokenFromJson,
     Map<String, String> headers = const {},
     this.allowBadCertificates = false,
     this.pageFieldKeys = const PageFieldKeys(),
     this.checkNetwork,
     this.appCache,
     this.errorResponseFactory = _defaultErrorFactory,
-  }) : headers = _buildHeaders(headers);
+  }) : refreshBodyBuilder = refreshBodyBuilder ?? _defaultRefreshBodyBuilder,
+       refreshTokenFromJson =
+           refreshTokenFromJson ?? _defaultRefreshTokenFromJson<TokenType>,
+       headers = _buildHeaders(headers);
 
   /// Returns a copy with selected configuration values replaced.
-  ApiConfig copyWith({
+  ApiConfig<TokenType> copyWith({
     Uri? apiUrl,
     CheckNetwork? checkNetwork,
     ICacheRepo? appCache,
     PageFieldKeys? pageFieldKeys,
     String? refreshTokenPath,
+    RefreshBodyBuilder? refreshBodyBuilder,
+    RefreshTokenFromJson<TokenType>? refreshTokenFromJson,
     String? loggerPath,
     Map<String, String>? headers,
     bool? allowBadCertificates,
     ErrorResponseFactory? errorResponseFactory,
   }) {
-    return ApiConfig(
+    return ApiConfig<TokenType>(
       apiUrl: apiUrl ?? this.apiUrl,
       checkNetwork: checkNetwork ?? this.checkNetwork,
       appCache: appCache ?? this.appCache,
       pageFieldKeys: pageFieldKeys ?? this.pageFieldKeys,
       refreshTokenPath: refreshTokenPath ?? this.refreshTokenPath,
+      refreshBodyBuilder: refreshBodyBuilder ?? this.refreshBodyBuilder,
+      refreshTokenFromJson: refreshTokenFromJson ?? this.refreshTokenFromJson,
       loggerPath: loggerPath ?? this.loggerPath,
       headers: headers ?? this.headers,
       allowBadCertificates: allowBadCertificates ?? this.allowBadCertificates,
@@ -72,6 +87,13 @@ final class ApiConfig {
 
   static IBaseErrorResponse _defaultErrorFactory() =>
       const DefaultErrorResponse();
+
+  static Map<String, dynamic> _defaultRefreshBodyBuilder(String refreshToken) =>
+      {'refreshToken': refreshToken};
+
+  static T _defaultRefreshTokenFromJson<T extends IBOAuth2Token>(
+    Map<String, dynamic> json,
+  ) => IBOAuth2Token.fromJson(json) as T;
 
   static Map<String, String> _buildHeaders(Map<String, String> headers) =>
       Map.unmodifiable(headers);

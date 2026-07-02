@@ -1,3 +1,9 @@
+## 0.0.9+16
+
+- Added generic refresh-token support for custom token models extending `IBOAuth2Token`.
+- Added configurable refresh request body and refresh response parser hooks.
+- Scoped refresh concurrency per client instance.
+
 ## 0.0.8+15
 
 - Treated all REST `2xx` HTTP status codes as successful responses.

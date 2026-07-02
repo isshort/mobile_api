@@ -1,6 +1,6 @@
 name: mobile_api
 description: Typed REST and GraphQL API helpers for Flutter apps, with token refresh, secure cache storage, multipart uploads, and network checks.
-version: 0.0.8+15
+version: 0.0.9+16
 homepage: https://pub.dev/packages/mobile_api
 repository: https://github.com/isshort/mobile_api
 

@@ -8,15 +8,18 @@ import 'package:http/io_client.dart';
 import '../../../mobile_api.dart';
 
 /// Default GraphQL client implementation with token refresh support.
-final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
+final class IGraphQlImpl<TokenType extends IBOAuth2Token> extends IGraphQl
+    with RefreshTokenMixin<TokenType> {
   /// Creates a GraphQL client from [apiConfig].
-  IGraphQlImpl({required ApiConfig apiConfig, http.Client? httpClient})
-    : _apiConfig = apiConfig,
-      _rawClient = httpClient ?? _createHttpClient(apiConfig) {
+  IGraphQlImpl({
+    required ApiConfig<TokenType> apiConfig,
+    http.Client? httpClient,
+  }) : _apiConfig = apiConfig,
+       _rawClient = httpClient ?? _createHttpClient(apiConfig) {
     _init();
   }
 
-  final ApiConfig _apiConfig;
+  final ApiConfig<TokenType> _apiConfig;
   final http.Client _rawClient;
 
   /// late variables
@@ -28,10 +31,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
       tokenStorage: InMemoryTokenStorage(),
       refreshToken: (p0, p1) async {
         final token = await updateRefreshToken();
-        return IBOAuth2Token(
-          accessToken: token?.accessToken ?? '',
-          refreshToken: token?.refreshToken ?? '',
-        );
+        return token;
       },
       shouldRefresh: (Response response) {
         return response.shouldRefresh;
@@ -366,7 +366,7 @@ final class IGraphQlImpl extends IGraphQl with RefreshTokenMixin {
   }
 
   @override
-  ApiConfig get apiConfig => _apiConfig;
+  ApiConfig<TokenType> get apiConfig => _apiConfig;
   @override
   http.Client get httpClient => _rawClient;
 

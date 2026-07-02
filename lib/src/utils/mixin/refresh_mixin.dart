@@ -19,8 +19,8 @@ final class HttpHeadersConst {
   static const acceptLanguage = 'Accept-Language';
 }
 
-mixin RefreshTokenMixin {
-  ApiConfig get apiConfig;
+mixin RefreshTokenMixin<TokenType extends IBOAuth2Token> {
+  ApiConfig<TokenType> get apiConfig;
   IBaseErrorResponse get errorResponseToJson;
 
   http.Client get httpClient;
@@ -29,7 +29,7 @@ mixin RefreshTokenMixin {
   String? get loggerPath => apiConfig.loggerPath;
 
   /// Concurrency guard so only one refresh runs at a time.
-  static Completer<IBOAuth2Token?>? _refreshCompleter;
+  Completer<TokenType?>? _refreshCompleter;
 
   Future<Failure<R, E>> checkNetworkStatus<R, E extends Exception>({
     required FromJsonFun<E> errorFromJson,
@@ -77,22 +77,21 @@ mixin RefreshTokenMixin {
   }
 
   /// Build refresh request body (override if backend differs).
-  Map<String, dynamic> buildRefreshBody(String refreshToken) => {
-    'refreshToken': refreshToken,
-  };
+  Map<String, dynamic> buildRefreshBody(String refreshToken) =>
+      apiConfig.refreshBodyBuilder(refreshToken);
 
   /// Called after new tokens stored (override for extra side-effects).
-  Future<void> onTokensUpdated(IBOAuth2Token token) async {}
+  Future<void> onTokensUpdated(TokenType token) async {}
 
   /// Override for custom logger payload shaping.
   Map<String, dynamic> buildLoggerPayload(String message) => {
     'description': message,
   };
-  Future<IBOAuth2Token?> updateRefreshToken() async {
+  Future<TokenType?> updateRefreshToken() async {
     if (_refreshCompleter != null) {
       return _refreshCompleter!.future;
     }
-    _refreshCompleter = Completer<IBOAuth2Token?>();
+    _refreshCompleter = Completer<TokenType?>();
 
     try {
       final refreshToken =
@@ -132,7 +131,7 @@ mixin RefreshTokenMixin {
         return null;
       }
 
-      final token = IBOAuth2Token.fromJson(tokenJson);
+      final token = apiConfig.refreshTokenFromJson(tokenJson);
 
       if (token.accessToken.isEmpty) {
         _refreshCompleter!.complete(null);

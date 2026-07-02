@@ -17,7 +17,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  mobile_api: ^0.0.8+15
+  mobile_api: ^0.0.9+16
 ```
 
 Import it:
@@ -59,6 +59,39 @@ await cache.saveAll(
     access: accessToken,
     refresh: refreshToken,
   ),
+);
+```
+
+Projects with a custom refresh payload or token model can extend
+`IBOAuth2Token` and configure the refresh parser:
+
+```dart
+class ProjectToken extends IBOAuth2Token {
+  ProjectToken({
+    required super.accessToken,
+    required super.refreshToken,
+    required this.tenantId,
+  });
+
+  factory ProjectToken.fromJson(Map<String, dynamic> json) => ProjectToken(
+        accessToken: json['accessToken'] as String,
+        refreshToken: json['refreshToken'] as String,
+        tenantId: json['tenantId'] as String,
+      );
+
+  final String tenantId;
+}
+
+final apiConfig = ApiConfig<ProjectToken>(
+  apiUrl: Uri.parse('https://api.example.com'),
+  refreshTokenPath: '/api/accounts/refresh',
+  appCache: cache,
+  refreshBodyBuilder: (refreshToken) => {
+    'refresh_token': refreshToken,
+    'grant_type': 'refresh_token',
+    'client_id': 'mobile-app',
+  },
+  refreshTokenFromJson: ProjectToken.fromJson,
 );
 ```
 

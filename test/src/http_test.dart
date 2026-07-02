@@ -39,6 +39,22 @@ const _hibetaHeaders = {
   'x-hibeta-tenant-mode': 'single-country',
 };
 
+class ProjectToken extends IBOAuth2Token {
+  ProjectToken({
+    required super.accessToken,
+    required super.refreshToken,
+    required this.tenantId,
+  });
+
+  factory ProjectToken.fromJson(Map<String, dynamic> json) => ProjectToken(
+    accessToken: json['accessToken'] as String,
+    refreshToken: json['refreshToken'] as String,
+    tenantId: json['tenantId'] as String? ?? '',
+  );
+
+  final String tenantId;
+}
+
 void main() {
   group('IHttpImpl', () {
     test('decodes successful JSON responses', () async {
@@ -303,6 +319,75 @@ void main() {
       );
 
       expect(response, isA<Success<AuthResponse, GeneralError>>());
+    });
+
+    test('refresh supports custom token subclasses and payloads', () async {
+      var protectedCalls = 0;
+      final cache = InMemoryCacheRepo(
+        CacheKeyBundle.tokenPair(
+          access: 'expired-token',
+          refresh: 'refresh-token',
+        ),
+      );
+      final client = MockClient((request) async {
+        if (request.url.path == '/api/me') {
+          protectedCalls++;
+          if (protectedCalls == 1) {
+            expect(
+              request.headers[HttpHeadersConst.authorization],
+              '${HttpHeadersConst.bearer} expired-token',
+            );
+            return http.Response('', 401);
+          }
+          expect(
+            request.headers[HttpHeadersConst.authorization],
+            '${HttpHeadersConst.bearer} renewed-token',
+          );
+          return http.Response('ok', 200);
+        }
+
+        expect(request.url.path, '/api/accounts/refresh');
+        expect(jsonDecode(request.body), {
+          'refresh_token': 'refresh-token',
+          'grant_type': 'refresh_token',
+          'client_id': 'mobile-app',
+        });
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'accessToken': 'renewed-token',
+              'refreshToken': 'renewed-refresh-token',
+              'tenantId': 'tenant-1',
+            },
+          }),
+          200,
+        );
+      });
+      final api = IHttpImpl<ProjectToken>(
+        apiConfig: ApiConfig<ProjectToken>(
+          apiUrl: Uri(scheme: 'https', host: 'api.example.test'),
+          refreshTokenPath: '/api/accounts/refresh',
+          appCache: cache,
+          refreshBodyBuilder: (refreshToken) => {
+            'refresh_token': refreshToken,
+            'grant_type': 'refresh_token',
+            'client_id': 'mobile-app',
+          },
+          refreshTokenFromJson: ProjectToken.fromJson,
+        ),
+        httpClient: client,
+      );
+
+      final response = await api.get('/api/me');
+
+      expect(response.statusCode, 200);
+      expect(response.body, 'ok');
+      expect(protectedCalls, 2);
+      expect(await cache.read(CoreCacheKey.accessToken), 'renewed-token');
+      expect(
+        await cache.read(CoreCacheKey.refreshToken),
+        'renewed-refresh-token',
+      );
     });
   });
 
