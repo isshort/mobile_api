@@ -13,11 +13,13 @@ ApiConfig _config({
   String path = '',
   ICacheRepo? appCache,
   Map<String, String> headers = const {},
+  PageFieldKeys pageFieldKeys = const PageFieldKeys(),
 }) {
   return ApiConfig(
     apiUrl: Uri(scheme: 'https', host: 'api.example.test', path: path),
     refreshTokenPath: '/api/accounts/refresh',
     appCache: appCache,
+    pageFieldKeys: pageFieldKeys,
     headers: {
       HttpHeadersConst.marketplace: 'ml',
       HttpHeadersConst.userAgent: 'mlApp',
@@ -516,6 +518,188 @@ query getShippers {
       );
 
       expect(response, isA<Success<List<ShipperRegister>, GeneralError>>());
+    });
+
+    test('queryCursorPage parses nodes and pageInfo cursor metadata', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/graphql');
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'shippers': {
+                'pageInfo': {'hasNextPage': true, 'endCursor': 'cursor-2'},
+                'nodes': [
+                  {'fullName': 'Node User', 'email': 'node@example.test'},
+                ],
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = IGraphQlImpl(
+        apiConfig: _config(
+          path: '/graphql',
+          pageFieldKeys: const PageFieldKeys(itemsKey: 'nodes'),
+        ),
+        httpClient: client,
+      );
+
+      final response = await api.queryCursorPage<ShipperRegister, GeneralError>(
+        field: 'shippers',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        path: '''
+query getShippers {
+  shippers {
+    pageInfo { hasNextPage endCursor }
+    nodes { fullName email }
+  }
+}
+''',
+      );
+
+      expect(
+        response,
+        isA<Success<CursorPage<ShipperRegister>, GeneralError>>(),
+      );
+      final success =
+          response as Success<CursorPage<ShipperRegister>, GeneralError>;
+      expect(success.value.items, hasLength(1));
+      expect(success.value.items.first.email, 'node@example.test');
+      expect(success.value.hasNextPage, isTrue);
+      expect(success.value.endCursor, 'cursor-2');
+    });
+
+    test('queryCursorPage supports custom PageFieldKeys', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'shipperConnection': {
+                'meta': {'more': true, 'cursor': 'custom-cursor'},
+                'edges': [
+                  {'fullName': 'Custom User', 'email': 'custom@example.test'},
+                ],
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = IGraphQlImpl(
+        apiConfig: _config(
+          path: '/graphql',
+          pageFieldKeys: const PageFieldKeys(
+            itemsKey: 'edges',
+            pageInfoKey: 'meta',
+            hasNextPageKey: 'more',
+            endCursorKey: 'cursor',
+          ),
+        ),
+        httpClient: client,
+      );
+
+      final response = await api.queryCursorPage<ShipperRegister, GeneralError>(
+        field: 'shipperConnection',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        path: 'query { shipperConnection { meta { more cursor } } }',
+      );
+
+      final success =
+          response as Success<CursorPage<ShipperRegister>, GeneralError>;
+      expect(success.value.items.single.email, 'custom@example.test');
+      expect(success.value.hasNextPage, isTrue);
+      expect(success.value.endCursor, 'custom-cursor');
+    });
+
+    test(
+      'queryCursorPage returns empty defaults for missing or malformed page',
+      () async {
+        var calls = 0;
+        final client = MockClient((request) async {
+          calls += 1;
+          final responseData = calls == 1
+              ? {
+                  'data': {'otherField': const {}},
+                }
+              : {
+                  'data': {'shippers': 'not-a-page'},
+                };
+          return http.Response(
+            jsonEncode(responseData),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+        final api = IGraphQlImpl(
+          apiConfig: _config(path: '/graphql'),
+          httpClient: client,
+        );
+
+        final missing = await api
+            .queryCursorPage<ShipperRegister, GeneralError>(
+              field: 'shippers',
+              dataFromJson: ShipperRegister.fromJson,
+              errorFromJson: GeneralError.fromJson,
+              path: 'query { shippers { pageInfo { hasNextPage } } }',
+            );
+        final malformed = await api
+            .queryCursorPage<ShipperRegister, GeneralError>(
+              field: 'shippers',
+              dataFromJson: ShipperRegister.fromJson,
+              errorFromJson: GeneralError.fromJson,
+              path: 'query { shippers { pageInfo { hasNextPage } } }',
+            );
+
+        for (final response in [missing, malformed]) {
+          final success =
+              response as Success<CursorPage<ShipperRegister>, GeneralError>;
+          expect(success.value.items, isEmpty);
+          expect(success.value.hasNextPage, isFalse);
+          expect(success.value.endCursor, isNull);
+        }
+      },
+    );
+
+    test('queryCursorPage returns Failure for GraphQL exceptions', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'errors': [
+              {
+                'message': 'GraphQL failed',
+                'extensions': {'code': 'BAD_USER_INPUT'},
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = IGraphQlImpl(
+        apiConfig: _config(path: '/graphql'),
+        httpClient: client,
+      );
+
+      final response = await api.queryCursorPage<ShipperRegister, GeneralError>(
+        field: 'shippers',
+        dataFromJson: ShipperRegister.fromJson,
+        errorFromJson: GeneralError.fromJson,
+        path: 'query { shippers { pageInfo { hasNextPage } } }',
+      );
+
+      expect(
+        response,
+        isA<Failure<CursorPage<ShipperRegister>, GeneralError>>(),
+      );
+      final failure =
+          response as Failure<CursorPage<ShipperRegister>, GeneralError>;
+      expect(failure.exception.reasonPhrase, 'GraphQL failed');
     });
   });
 }

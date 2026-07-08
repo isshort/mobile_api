@@ -1,6 +1,8 @@
 import 'package:mobile_api/src/utils/response/result.dart';
 import 'package:mobile_api/src/utils/types/types.dart';
 
+import '../model/cursor_page.dart';
+
 extension QueryPage on QueryResponse {
   Map<String, dynamic>? _asMap(String key) {
     final v = data == null ? null : data![key];
@@ -28,6 +30,16 @@ extension QueryPage on QueryResponse {
     return false;
   }
 
+  String? endCursor({required PageFieldKeys keys, required String field}) {
+    final node = pageNode(field);
+    final info = node?[keys.pageInfoKey];
+    if (info is Map<String, dynamic>) {
+      final val = info[keys.endCursorKey];
+      return val is String ? val : null;
+    }
+    return null;
+  }
+
   Success<List<R>, E> responsePageList<R, E extends Exception>({
     required FromJsonFun<R> fromJson,
     required String field,
@@ -40,6 +52,24 @@ extension QueryPage on QueryResponse {
     return Success(
       itemsList,
       hasNextPage: hasNextPage(keys: keys, field: field),
+    );
+  }
+
+  Success<CursorPage<R>, E> responseCursorPage<R, E extends Exception>({
+    required FromJsonFun<R> fromJson,
+    required String field,
+    required PageFieldKeys keys,
+  }) {
+    final itemsList = pageItems(
+      field: field,
+      keys: keys,
+    ).whereType<Map<String, dynamic>>().map(fromJson).toList();
+    return Success(
+      CursorPage(
+        items: itemsList,
+        hasNextPage: hasNextPage(keys: keys, field: field),
+        endCursor: endCursor(keys: keys, field: field),
+      ),
     );
   }
 

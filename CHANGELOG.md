@@ -1,3 +1,9 @@
+## 0.0.10+17
+
+- Added `CursorPage<T>` for reusable GraphQL cursor pagination payloads.
+- Added `IGraphQl.queryCursorPage` for decoding page items with `pageInfo.hasNextPage` and nullable `pageInfo.endCursor`.
+- Added configurable `PageFieldKeys.endCursorKey` while keeping existing list query behavior unchanged.
+
 ## 0.0.9+16
 
 - Added generic refresh-token support for custom token models extending `IBOAuth2Token`.

@@ -1,4 +1,5 @@
 import 'package:graphql/client.dart';
+import 'package:mobile_api/src/graphql/model/cursor_page.dart';
 import 'package:mobile_api/src/utils/enum/duration.dart';
 import 'package:mobile_api/src/utils/response/result.dart';
 import 'package:mobile_api/src/utils/types/custom_type.dart';
@@ -10,6 +11,15 @@ abstract class IGraphQl {
 
   /// Executes a paginated query and decodes the configured list field.
   Future<Result<List<R>, E>> queryList<R, E extends Exception>({
+    required FromJsonFun<R> dataFromJson,
+    required ErrorFromJson<E> errorFromJson,
+    required String path,
+    required String field,
+    MapParam? params,
+  });
+
+  /// Executes a paginated query and decodes items plus cursor metadata.
+  Future<Result<CursorPage<R>, E>> queryCursorPage<R, E extends Exception>({
     required FromJsonFun<R> dataFromJson,
     required ErrorFromJson<E> errorFromJson,
     required String path,

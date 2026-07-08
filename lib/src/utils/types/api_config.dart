@@ -110,10 +110,14 @@ class PageFieldKeys {
   /// Default GraphQL next-page flag key.
   final String hasNextPageKey;
 
+  /// Default GraphQL end cursor key.
+  final String endCursorKey;
+
   /// Creates key names for paginated GraphQL response containers.
   const PageFieldKeys({
     this.itemsKey = 'items',
     this.pageInfoKey = 'pageInfo',
     this.hasNextPageKey = 'hasNextPage',
+    this.endCursorKey = 'endCursor',
   });
 }

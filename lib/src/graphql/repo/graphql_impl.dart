@@ -205,6 +205,32 @@ final class IGraphQlImpl<TokenType extends IBOAuth2Token> extends IGraphQl
   }
 
   @override
+  Future<Result<CursorPage<R>, E>> queryCursorPage<R, E extends Exception>({
+    required FromJsonFun<R> dataFromJson,
+    required ErrorFromJson<E> errorFromJson,
+    required String path,
+    required String field,
+    MapParam? params,
+  }) async {
+    return handleNetworkCall(() async {
+      await _getHeaders();
+      final request = await _queryRequest(path: path, variables: params);
+      if (request.hasException) {
+        return errorGraphQlResponse(
+          errorFromJson,
+          request,
+          errorResponseToJson,
+        );
+      }
+      return request.responseCursorPage<R, E>(
+        fromJson: dataFromJson,
+        field: field,
+        keys: apiConfig.pageFieldKeys,
+      );
+    }, errorFromJson);
+  }
+
+  @override
   Future<Result<List<R>, E>> list<R, E extends Exception>({
     required FromJsonFun<R> dataFromJson,
     required ErrorFromJson<E> errorFromJson,
